@@ -175,7 +175,7 @@ export function Settings({ onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={t('settings.title')}
-        className="h-[min(720px,100%)] w-[min(980px,100%)] overflow-hidden rounded-[16px] shadow-float"
+        className="h-[min(800px,100%)] w-[min(1080px,100%)] overflow-hidden rounded-[16px] shadow-float"
         initial={{ opacity: 0, scale: 0.98, y: 6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.16, ease: 'easeOut' }}
