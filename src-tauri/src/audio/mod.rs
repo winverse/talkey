@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod mic_mute;
 
 pub use capture::{AudioCaptureHandle, AudioConfig, CaptureState};
 

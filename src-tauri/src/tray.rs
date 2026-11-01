@@ -16,6 +16,8 @@ struct TrayLabels {
     settings: &'static str,
     microphone: &'static str,
     system_default: &'static str,
+    mute_mic: &'static str,
+    unmute_mic: &'static str,
     version: &'static str,
     quit: &'static str,
 }
@@ -29,6 +31,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "设置...",
             microphone: "选择麦克风",
             system_default: "系统默认",
+            mute_mic: "关闭麦克风",
+            unmute_mic: "打开麦克风",
             version: "版本",
             quit: "退出 Talkey",
         },
@@ -39,6 +43,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "設定...",
             microphone: "マイクを選択",
             system_default: "システムのデフォルト",
+            mute_mic: "マイクをオフ",
+            unmute_mic: "マイクをオン",
             version: "バージョン",
             quit: "Talkey を終了",
         },
@@ -49,6 +55,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "설정...",
             microphone: "마이크 선택",
             system_default: "시스템 기본값",
+            mute_mic: "마이크 끄기",
+            unmute_mic: "마이크 켜기",
             version: "버전",
             quit: "Talkey 종료",
         },
@@ -59,6 +67,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Paramètres...",
             microphone: "Choisir le micro",
             system_default: "Par défaut du système",
+            mute_mic: "Couper le micro",
+            unmute_mic: "Activer le micro",
             version: "Version",
             quit: "Quitter Talkey",
         },
@@ -69,6 +79,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Einstellungen...",
             microphone: "Mikrofon wählen",
             system_default: "Systemstandard",
+            mute_mic: "Mikrofon stummschalten",
+            unmute_mic: "Mikrofon einschalten",
             version: "Version",
             quit: "Talkey beenden",
         },
@@ -79,6 +91,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Configuración...",
             microphone: "Elegir micrófono",
             system_default: "Predeterminado del sistema",
+            mute_mic: "Silenciar micrófono",
+            unmute_mic: "Activar micrófono",
             version: "Versión",
             quit: "Salir de Talkey",
         },
@@ -89,6 +103,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Configurações...",
             microphone: "Escolher microfone",
             system_default: "Padrão do sistema",
+            mute_mic: "Desligar microfone",
+            unmute_mic: "Ligar microfone",
             version: "Versão",
             quit: "Sair do Talkey",
         },
@@ -99,6 +115,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Настройки...",
             microphone: "Выбрать микрофон",
             system_default: "Системный по умолчанию",
+            mute_mic: "Выключить микрофон",
+            unmute_mic: "Включить микрофон",
             version: "Версия",
             quit: "Выйти из Talkey",
         },
@@ -109,6 +127,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Impostazioni...",
             microphone: "Scegli microfono",
             system_default: "Predefinito di sistema",
+            mute_mic: "Disattiva microfono",
+            unmute_mic: "Attiva microfono",
             version: "Versione",
             quit: "Esci da Talkey",
         },
@@ -119,6 +139,8 @@ fn get_tray_labels(lang: &str) -> TrayLabels {
             settings: "Settings...",
             microphone: "Select Microphone",
             system_default: "System Default",
+            mute_mic: "Mute Microphone",
+            unmute_mic: "Unmute Microphone",
             version: "Version",
             quit: "Quit Talkey",
         },
@@ -193,11 +215,84 @@ pub fn spawn_microphone_watcher(app: tauri::AppHandle) {
                 changed
             };
             if changed {
+                // A microphone plugged in while muted starts muted too.
+                if mic_muted() {
+                    audio::mic_mute::set_muted(true);
+                }
                 refresh_tray(&app);
             }
         })
         .map(|_| ())
         .unwrap_or_else(|e| tracing::warn!("Failed to start the microphone watcher: {}", e));
+}
+
+/// Whether the microphone is muted system-wide from the tray.
+static MIC_MUTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Menu id for muting or unmuting the microphone system-wide.
+pub const MIC_MUTE_ID: &str = "toggle_mic_mute";
+
+fn mic_muted() -> bool {
+    MIC_MUTED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Reads the current system mute state and shows it in the tray icon.
+pub fn init_mic_mute(app: &tauri::AppHandle) {
+    if !audio::mic_mute::SUPPORTED {
+        return;
+    }
+    MIC_MUTED.store(
+        audio::mic_mute::is_muted(),
+        std::sync::atomic::Ordering::SeqCst,
+    );
+    update_tray_icon(app);
+    refresh_tray(app);
+}
+
+/// Mutes or unmutes every input device, like the Mic Drop menu bar app.
+pub fn toggle_mic_mute(app: &tauri::AppHandle) {
+    if !audio::mic_mute::SUPPORTED {
+        return;
+    }
+    let muted = !mic_muted();
+    let changed = audio::mic_mute::set_muted(muted);
+    tracing::info!(
+        "Microphone {} on {changed} input device(s)",
+        if muted { "muted" } else { "unmuted" }
+    );
+    MIC_MUTED.store(muted, std::sync::atomic::Ordering::SeqCst);
+    update_tray_icon(app);
+    refresh_tray(app);
+}
+
+/// Shows a "no" sign in the menu bar while the microphone is muted.
+fn update_tray_icon(app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let muted = mic_muted();
+        let icon = if muted {
+            tauri::include_image!("icons/tray-muted-template.png")
+        } else {
+            tauri::include_image!("icons/tray-template.png")
+        };
+        let tooltip = if muted {
+            format!(
+                "Talkey — {}",
+                get_tray_labels(&tray_language(app)).unmute_mic
+            )
+        } else {
+            "Talkey".to_string()
+        };
+        if let Some(tray_handle) = app.try_state::<TrayHandle>() {
+            if let Ok(tray) = tray_handle.tray.lock() {
+                let _ = tray.set_icon(Some(icon));
+                let _ = tray.set_icon_as_template(true);
+                let _ = tray.set_tooltip(Some(tooltip));
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
 }
 
 /// Menu id prefix for a microphone; the rest of the id is the device name.
@@ -262,6 +357,18 @@ pub fn build_tray_menu(
     let microphone =
         Submenu::with_id_and_items(app, "microphone", labels.microphone, true, &microphone_refs)?;
 
+    let mic_mute = MenuItem::with_id(
+        app,
+        MIC_MUTE_ID,
+        if mic_muted() {
+            labels.unmute_mic
+        } else {
+            labels.mute_mic
+        },
+        true,
+        None::<&str>,
+    )?;
+
     let sep2 = PredefinedMenuItem::separator(app)?;
     let version = MenuItem::with_id(
         app,
@@ -272,20 +379,19 @@ pub fn build_tray_menu(
     )?;
     let quit = MenuItem::with_id(app, "quit", labels.quit, true, Some("CmdOrCtrl+Q"))?;
 
-    let menu = Menu::with_items(
-        app,
-        &[
-            &open_home,
-            &history,
-            &add_word,
-            &sep1,
-            &settings,
-            &microphone,
-            &sep2,
-            &version,
-            &quit,
-        ],
-    )?;
+    let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
+        &open_home,
+        &history,
+        &add_word,
+        &sep1,
+        &settings,
+        &microphone,
+    ];
+    if audio::mic_mute::SUPPORTED {
+        items.push(&mic_mute);
+    }
+    items.extend([&sep2 as &dyn IsMenuItem<tauri::Wry>, &version, &quit]);
+    let menu = Menu::with_items(app, &items)?;
     Ok(menu)
 }
 
@@ -312,6 +418,8 @@ mod tests {
         assert_eq!(labels.add_word, "사전에 단어 추가");
         assert_eq!(labels.settings, "설정...");
         assert_eq!(labels.quit, "Talkey 종료");
+        assert_eq!(labels.mute_mic, "마이크 끄기");
+        assert_eq!(labels.unmute_mic, "마이크 켜기");
     }
 
     #[test]

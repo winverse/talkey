@@ -1077,6 +1077,7 @@ pub fn run() {
                     "history" => show_main_window_with(app, "tray:history"),
                     "add_word" => show_main_window_with(app, "tray:add-word"),
                     "settings" => show_main_window_with(app, "tray:settings"),
+                    tray::MIC_MUTE_ID => tray::toggle_mic_mute(app),
                     id => {
                         let device = if id == tray::MICROPHONE_DEFAULT_ID {
                             Some(String::new())
@@ -1107,6 +1108,17 @@ pub fn run() {
                 .show_menu_on_left_click(cfg!(target_os = "macos"))
                 .on_tray_icon_event(|tray, event| {
                     if cfg!(target_os = "macos") {
+                        // Right click mutes or unmutes the microphone, like Mic Drop.
+                        if matches!(
+                            event,
+                            TrayIconEvent::Click {
+                                button: MouseButton::Right,
+                                button_state: MouseButtonState::Up,
+                                ..
+                            }
+                        ) {
+                            tray::toggle_mic_mute(tray.app_handle());
+                        }
                         return;
                     }
                     let should_show = matches!(
@@ -1126,9 +1138,13 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Right click is the microphone mute toggle on macOS, not the menu.
+            #[cfg(target_os = "macos")]
+            let _ = tray.with_inner_tray_icon(|inner| inner.set_show_menu_on_right_click(false));
             app.manage(TrayHandle {
                 tray: Mutex::new(tray),
             });
+            tray::init_mic_mute(&app_handle);
             tray::spawn_microphone_watcher(app_handle.clone());
 
             // Close-to-tray: intercept window close
