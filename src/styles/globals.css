@@ -1,26 +1,37 @@
 @import 'tailwindcss';
 
+/* Tailwind `dark:` follows the `.dark` class set by useTheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  /* Clean neutral palette */
-  --color-bg-primary: #f5f5f5;
-  --color-bg-secondary: #ebebeb;
-  --color-bg-tertiary: #e0e0e0;
-  --color-bg-elevated: #fafafa;
+  /* Clean neutral palette (white canvas, grey sidebar) */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f4f4f5;
+  --color-bg-tertiary: #e8e8ea;
+  --color-bg-elevated: #ffffff;
+  --color-bg-sidebar: #f7f7f8;
 
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #666666;
-  --color-text-tertiary: #999999;
+  --color-text-primary: #141414;
+  --color-text-secondary: #6e6e73;
+  --color-text-tertiary: #a1a1a6;
 
-  --color-accent: #2abba7;
-  --color-accent-hover: #22a08e;
-  --color-accent-light: #e6f7f5;
+  --color-accent: #17a493;
+  --color-accent-hover: #12907f;
+  --color-accent-light: #e3f6f3;
+
+  /* Activity grid ("grass") levels */
+  --color-grass-0: #ededef;
+  --color-grass-1: #c4ede6;
+  --color-grass-2: #7fd8c8;
+  --color-grass-3: #2fbca6;
+  --color-grass-4: #11897a;
 
   --color-success: #34c759;
   --color-warning: #ff9500;
   --color-error: #ff3b30;
 
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-border-focus: #2abba7;
+  --color-border: rgba(0, 0, 0, 0.07);
+  --color-border-focus: #17a493;
 
   /* Jelly palette tokens */
   --color-jelly-primary: rgba(42, 187, 167, 0.2);
@@ -86,18 +97,27 @@ body,
 
 /* ─── Dark Mode ─── */
 .dark {
-  --color-bg-primary: #1a1a1a;
-  --color-bg-secondary: #242424;
-  --color-bg-tertiary: #2e2e2e;
-  --color-bg-elevated: #2a2a2a;
+  --color-bg-primary: #151515;
+  --color-bg-secondary: #1f1f20;
+  --color-bg-tertiary: #2a2a2c;
+  --color-bg-elevated: #1c1c1d;
+  --color-bg-sidebar: #1a1a1b;
 
   --color-text-primary: #f0f0f0;
-  --color-text-secondary: #a0a0a0;
-  --color-text-tertiary: #707070;
+  --color-text-secondary: #a0a0a5;
+  --color-text-tertiary: #6f6f74;
 
-  --color-accent-light: #1a3d37;
+  --color-accent: #2abba7;
+  --color-accent-hover: #3ccdb8;
+  --color-accent-light: #16332f;
 
-  --color-border: rgba(255, 255, 255, 0.08);
+  --color-grass-0: #232325;
+  --color-grass-1: #123d37;
+  --color-grass-2: #15675b;
+  --color-grass-3: #1f9c89;
+  --color-grass-4: #3dd3bb;
+
+  --color-border: rgba(255, 255, 255, 0.07);
 
   --color-jelly-primary: rgba(42, 187, 167, 0.25);
   --color-jelly-glow: rgba(42, 187, 167, 0.35);
@@ -654,4 +674,116 @@ body,
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary);
+}
+
+/* ─── Flat theme (winverse) ───
+   Typeless-style calm surfaces on top of the OpenTypeless palette.
+   Overrides the jelly look for cards, buttons and navigation; the
+   recording capsule keeps its own jelly styles. */
+.jelly-surface,
+.dark .jelly-surface,
+.jelly-surface-flat,
+.dark .jelly-surface-flat {
+  background: var(--color-bg-sidebar);
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.jelly-card,
+.dark .jelly-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease;
+}
+.jelly-card::before,
+.dark .jelly-card::before,
+.jelly-btn::before,
+.dark .jelly-btn::before {
+  display: none;
+}
+.jelly-card:hover,
+.dark .jelly-card:hover {
+  transform: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.jelly-btn,
+.dark .jelly-btn {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: none;
+  transition: background-color 0.15s ease;
+}
+.jelly-btn:hover,
+.dark .jelly-btn:hover {
+  transform: none;
+  background: var(--color-bg-secondary);
+  box-shadow: none;
+}
+.jelly-btn:active {
+  transform: none;
+}
+
+.jelly-btn-accent,
+.dark .jelly-btn-accent {
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: none;
+}
+.jelly-btn-accent:hover,
+.dark .jelly-btn-accent:hover {
+  transform: none;
+  background: var(--color-accent-hover);
+  box-shadow: none;
+}
+.jelly-btn-accent:active {
+  transform: none;
+}
+
+.jelly-nav-active {
+  background: rgba(0, 0, 0, 0.06);
+  box-shadow: none;
+  border-radius: 8px;
+  color: inherit !important;
+}
+.dark .jelly-nav-active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Faint dot texture behind the home insights (fades out at the edges) */
+.dot-canvas {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 14px 14px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 40%, transparent 100%);
+}
+.dark .dot-canvas {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+}
+
+/* Activity grid cells before the first recorded day */
+.grass-before {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-grass-0) 0 2px,
+    transparent 2px 4px
+  );
+}
+
+/* Keyboard key chip */
+.key-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--color-text-primary);
+  white-space: nowrap;
 }

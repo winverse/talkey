@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "OpenTypeless",
-    "tagline": "Голосовой ввод с ИИ"
+    "tagline": "Голосовой ввод с ИИ",
+    "freeBadge": "Free"
   },
   "nav": {
     "home": "Главная",
@@ -11,7 +12,8 @@
     "account": "Аккаунт",
     "upgrade": "Обновить",
     "pro": "Pro",
-    "mainNavigation": "Основная навигация"
+    "mainNavigation": "Основная навигация",
+    "dictionary": "Dictionary"
   },
   "ask": {
     "title": "Спросить",
@@ -76,7 +78,35 @@
     "disabled": "Отключено",
     "outputMode": "Режим вывода",
     "wordsRemaining": "Осталось слов",
-    "wordsReset": "Сброс {{date}}"
+    "wordsReset": "Сброс {{date}}",
+    "heroTitle": "Speak, and it's written",
+    "insights": "Insights",
+    "wordsDictated": "Words dictated",
+    "timeSaved": "Time saved",
+    "avgSpeed": "Average dictation speed",
+    "totalDictation": "Total dictation time",
+    "unitWords": "words",
+    "unitHr": "hr",
+    "unitMin": "min",
+    "unitDays": "days",
+    "timeSavedHint": "Compared with typing at 40 WPM",
+    "activeDays": "Active days",
+    "currentStreak": "Current streak",
+    "longestStreak": "Longest streak",
+    "less": "Less",
+    "more": "More",
+    "cellTooltip": "{{date}} · {{count}} dictations · {{words}} words",
+    "cellTooltipEmpty": "{{date}} · No dictations",
+    "shortcuts": "Shortcuts",
+    "shortcutDictate": "Dictate",
+    "shortcutTranslate": "Translate",
+    "shortcutAsk": "Ask anything",
+    "notSet": "Not set",
+    "polishStyle": "Polish style",
+    "version": "Version {{version}}",
+    "recent": "Recent",
+    "viewAll": "View all",
+    "noRecent": "Your dictations will show up here."
   },
   "onboarding": {
     "speakToWrite": "Говорите, чтобы писать — превращайте голос в обработанный текст в реальном времени",
@@ -472,7 +502,10 @@
     "mappingResetConfirm": "Delete all device-only app mappings?",
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
-    "dictationMode": "Режим диктовки"
+    "dictationMode": "Режим диктовки",
+    "close": "Close",
+    "unsavedClose": "You have unsaved changes.",
+    "discardAndClose": "Discard and close"
   },
   "contextFamilies": {
     "email": "Email",
@@ -889,5 +922,14 @@
       "openrouter": "OpenRouter",
       "cloud": "OpenTypeless Cloud"
     }
+  },
+  "sidebar": {
+    "engines": "Engines in use",
+    "stt": "Speech",
+    "polish": "AI polish",
+    "off": "Off",
+    "freeNote": "Free · no usage limits",
+    "help": "About",
+    "local": "local"
   }
 }

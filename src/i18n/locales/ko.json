@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "OpenTypeless",
-    "tagline": "AI 음성 입력"
+    "tagline": "AI 음성 입력",
+    "freeBadge": "무료"
   },
   "nav": {
     "home": "홈",
@@ -11,7 +12,8 @@
     "account": "계정",
     "upgrade": "업그레이드",
     "pro": "Pro",
-    "mainNavigation": "메인 내비게이션"
+    "mainNavigation": "메인 내비게이션",
+    "dictionary": "사전"
   },
   "ask": {
     "title": "질문",
@@ -76,7 +78,35 @@
     "disabled": "비활성화",
     "outputMode": "출력 모드",
     "wordsRemaining": "남은 words",
-    "wordsReset": "{{date}} 재설정"
+    "wordsReset": "{{date}} 재설정",
+    "heroTitle": "말하면, 글이 됩니다",
+    "insights": "인사이트",
+    "wordsDictated": "받아쓴 단어 수",
+    "timeSaved": "절약된 시간",
+    "avgSpeed": "평균 받아쓰기 속도",
+    "totalDictation": "총 받아쓰기 시간",
+    "unitWords": "단어",
+    "unitHr": "시간",
+    "unitMin": "분",
+    "unitDays": "일",
+    "timeSavedHint": "타자 40 WPM과 비교한 값",
+    "activeDays": "활동 일수",
+    "currentStreak": "현재 연속 일수",
+    "longestStreak": "최장 연속 일수",
+    "less": "적게",
+    "more": "더 많이",
+    "cellTooltip": "{{date}} · {{count}}건 · {{words}}단어",
+    "cellTooltipEmpty": "{{date}} · 기록 없음",
+    "shortcuts": "단축키",
+    "shortcutDictate": "말하기",
+    "shortcutTranslate": "번역하기",
+    "shortcutAsk": "무엇이든 물어보세요",
+    "notSet": "설정 안 됨",
+    "polishStyle": "다듬기 스타일",
+    "version": "버전 {{version}}",
+    "recent": "최근 받아쓰기",
+    "viewAll": "모두 보기",
+    "noRecent": "받아쓴 내용이 여기에 표시됩니다."
   },
   "onboarding": {
     "speakToWrite": "말해서 글 쓰기 — 음성을 실시간으로 다듬어진 텍스트로 변환합니다",
@@ -472,7 +502,10 @@
     "mappingResetConfirm": "Delete all device-only app mappings?",
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
-    "dictationMode": "받아쓰기 모드"
+    "dictationMode": "받아쓰기 모드",
+    "close": "닫기",
+    "unsavedClose": "저장하지 않은 변경이 있어요.",
+    "discardAndClose": "저장 안 하고 닫기"
   },
   "contextFamilies": {
     "email": "Email",
@@ -889,5 +922,14 @@
       "openrouter": "OpenRouter",
       "cloud": "OpenTypeless Cloud"
     }
+  },
+  "sidebar": {
+    "engines": "사용 중인 엔진",
+    "stt": "음성 인식",
+    "polish": "AI 다듬기",
+    "off": "꺼짐",
+    "freeNote": "무료 · 사용량 제한 없음",
+    "help": "정보",
+    "local": "로컬"
   }
 }

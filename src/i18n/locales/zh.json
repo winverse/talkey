@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "OpenTypeless",
-    "tagline": "AI 语音输入"
+    "tagline": "AI 语音输入",
+    "freeBadge": "Free"
   },
   "nav": {
     "home": "首页",
@@ -11,7 +12,8 @@
     "account": "账户",
     "upgrade": "升级",
     "pro": "Pro",
-    "mainNavigation": "主导航"
+    "mainNavigation": "主导航",
+    "dictionary": "Dictionary"
   },
   "ask": {
     "title": "问答",
@@ -76,7 +78,35 @@
     "aiPolish": "AI 润色",
     "enabled": "已启用",
     "disabled": "已禁用",
-    "outputMode": "文字写入"
+    "outputMode": "文字写入",
+    "heroTitle": "Speak, and it's written",
+    "insights": "Insights",
+    "wordsDictated": "Words dictated",
+    "timeSaved": "Time saved",
+    "avgSpeed": "Average dictation speed",
+    "totalDictation": "Total dictation time",
+    "unitWords": "words",
+    "unitHr": "hr",
+    "unitMin": "min",
+    "unitDays": "days",
+    "timeSavedHint": "Compared with typing at 40 WPM",
+    "activeDays": "Active days",
+    "currentStreak": "Current streak",
+    "longestStreak": "Longest streak",
+    "less": "Less",
+    "more": "More",
+    "cellTooltip": "{{date}} · {{count}} dictations · {{words}} words",
+    "cellTooltipEmpty": "{{date}} · No dictations",
+    "shortcuts": "Shortcuts",
+    "shortcutDictate": "Dictate",
+    "shortcutTranslate": "Translate",
+    "shortcutAsk": "Ask anything",
+    "notSet": "Not set",
+    "polishStyle": "Polish style",
+    "version": "Version {{version}}",
+    "recent": "Recent",
+    "viewAll": "View all",
+    "noRecent": "Your dictations will show up here."
   },
   "onboarding": {
     "speakToWrite": "说话即写作 — 实时将语音转化为润色文本",
@@ -472,7 +502,10 @@
     "mappingResetConfirm": "删除所有仅保存在本机的应用映射？",
     "mappingResetConfirmAction": "重置映射",
     "mappingNoMappings": "暂无自定义应用映射",
-    "dictationMode": "听写触发方式"
+    "dictationMode": "听写触发方式",
+    "close": "Close",
+    "unsavedClose": "You have unsaved changes.",
+    "discardAndClose": "Discard and close"
   },
   "contextFamilies": {
     "email": "邮件",
@@ -889,5 +922,14 @@
       "openrouter": "OpenRouter",
       "cloud": "OpenTypeless 云服务"
     }
+  },
+  "sidebar": {
+    "engines": "Engines in use",
+    "stt": "Speech",
+    "polish": "AI polish",
+    "off": "Off",
+    "freeNote": "Free · no usage limits",
+    "help": "About",
+    "local": "local"
   }
 }

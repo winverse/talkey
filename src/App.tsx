@@ -26,6 +26,7 @@ import { MainLayout } from './components/MainLayout'
 import { HomePage } from './components/HomePage'
 import { UpgradePage } from './components/UpgradePage'
 import { AccountPage } from './components/AccountPage'
+import { DictionaryPage } from './components/DictionaryPage'
 import { AskPanel } from './components/AskPanel'
 import { ToastContainer } from './components/Toast'
 import { UpdatePrompt } from './components/UpdatePrompt'
@@ -100,7 +101,7 @@ function MainApp() {
   const setHotkeyRegistrationError = useAppStore((s) => s.setHotkeyRegistrationError)
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState(false)
-  const { route, navigate } = useRoute()
+  const { route, page, navigate, closeSettings } = useRoute()
 
   useEffect(() => {
     loadOnboardingCompleted().then(async (done) => {
@@ -219,11 +220,12 @@ function MainApp() {
 
   return (
     <MainLayout>
-      {route === 'home' && <HomePage />}
-      {route === 'settings' && <Settings />}
-      {route === 'history' && <History />}
-      {route === 'upgrade' && <UpgradePage />}
-      {route === 'account' && <AccountPage />}
+      {page === 'home' && <HomePage />}
+      {page === 'history' && <History />}
+      {page === 'dictionary' && <DictionaryPage />}
+      {page === 'upgrade' && <UpgradePage />}
+      {page === 'account' && <AccountPage />}
+      {route === 'settings' && <Settings onClose={closeSettings} />}
       <UpdatePrompt />
       <ToastContainer />
     </MainLayout>

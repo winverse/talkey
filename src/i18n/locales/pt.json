@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "OpenTypeless",
-    "tagline": "Entrada de Voz com IA"
+    "tagline": "Entrada de Voz com IA",
+    "freeBadge": "Free"
   },
   "nav": {
     "home": "Início",
@@ -11,7 +12,8 @@
     "account": "Conta",
     "upgrade": "Atualizar",
     "pro": "Pro",
-    "mainNavigation": "Navegação principal"
+    "mainNavigation": "Navegação principal",
+    "dictionary": "Dictionary"
   },
   "ask": {
     "title": "Perguntar",
@@ -76,7 +78,35 @@
     "disabled": "Desativado",
     "outputMode": "Modo de Saída",
     "wordsRemaining": "Palavras restantes",
-    "wordsReset": "Reinicia em {{date}}"
+    "wordsReset": "Reinicia em {{date}}",
+    "heroTitle": "Speak, and it's written",
+    "insights": "Insights",
+    "wordsDictated": "Words dictated",
+    "timeSaved": "Time saved",
+    "avgSpeed": "Average dictation speed",
+    "totalDictation": "Total dictation time",
+    "unitWords": "words",
+    "unitHr": "hr",
+    "unitMin": "min",
+    "unitDays": "days",
+    "timeSavedHint": "Compared with typing at 40 WPM",
+    "activeDays": "Active days",
+    "currentStreak": "Current streak",
+    "longestStreak": "Longest streak",
+    "less": "Less",
+    "more": "More",
+    "cellTooltip": "{{date}} · {{count}} dictations · {{words}} words",
+    "cellTooltipEmpty": "{{date}} · No dictations",
+    "shortcuts": "Shortcuts",
+    "shortcutDictate": "Dictate",
+    "shortcutTranslate": "Translate",
+    "shortcutAsk": "Ask anything",
+    "notSet": "Not set",
+    "polishStyle": "Polish style",
+    "version": "Version {{version}}",
+    "recent": "Recent",
+    "viewAll": "View all",
+    "noRecent": "Your dictations will show up here."
   },
   "onboarding": {
     "speakToWrite": "Fale para escrever — transforme sua voz em texto polido em tempo real",
@@ -472,7 +502,10 @@
     "mappingResetConfirm": "Delete all device-only app mappings?",
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
-    "dictationMode": "Modo de ditado"
+    "dictationMode": "Modo de ditado",
+    "close": "Close",
+    "unsavedClose": "You have unsaved changes.",
+    "discardAndClose": "Discard and close"
   },
   "contextFamilies": {
     "email": "Email",
@@ -889,5 +922,14 @@
       "openrouter": "OpenRouter",
       "cloud": "OpenTypeless Cloud"
     }
+  },
+  "sidebar": {
+    "engines": "Engines in use",
+    "stt": "Speech",
+    "polish": "AI polish",
+    "off": "Off",
+    "freeNote": "Free · no usage limits",
+    "help": "About",
+    "local": "local"
   }
 }

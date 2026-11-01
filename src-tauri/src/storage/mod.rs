@@ -1296,6 +1296,45 @@ pub struct HistoryStore {
     conn: Mutex<Connection>,
 }
 
+/// Per-day dictation totals for the home insights and activity grid.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct DailyUsage {
+    /// Local date `YYYY-MM-DD` (history timestamps are stored in local time).
+    pub date: String,
+    pub entries: u32,
+    /// Whitespace-separated words of the inserted text (polished, or raw when polish is empty).
+    pub words: u32,
+    pub chars: u32,
+    pub duration_ms: u64,
+}
+
+/// Aggregate (date, text, duration_ms) rows into per-day totals, oldest first.
+pub fn aggregate_daily_usage(
+    rows: impl IntoIterator<Item = (String, String, i64)>,
+) -> Vec<DailyUsage> {
+    let mut days: std::collections::BTreeMap<String, DailyUsage> =
+        std::collections::BTreeMap::new();
+    for (date, text, duration_ms) in rows {
+        let text = text.trim();
+        if date.len() < 10 || text.is_empty() {
+            continue;
+        }
+        let date = date[..10].to_string();
+        let day = days.entry(date.clone()).or_insert_with(|| DailyUsage {
+            date,
+            entries: 0,
+            words: 0,
+            chars: 0,
+            duration_ms: 0,
+        });
+        day.entries += 1;
+        day.words += text.split_whitespace().count() as u32;
+        day.chars += text.chars().filter(|c| !c.is_whitespace()).count() as u32;
+        day.duration_ms += duration_ms.max(0) as u64;
+    }
+    days.into_values().collect()
+}
+
 impl HistoryStore {
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(&db_path)?;
@@ -1429,6 +1468,26 @@ impl HistoryStore {
         }
 
         Ok(())
+    }
+
+    pub async fn daily_usage(&self) -> Result<Vec<DailyUsage>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT created_at,
+                    CASE WHEN TRIM(polished_text) <> '' THEN polished_text ELSE raw_text END,
+                    COALESCE(duration_ms, 0)
+             FROM history",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(aggregate_daily_usage(rows))
     }
 
     pub async fn list(&self, limit: u32, offset: u32) -> Result<Vec<HistoryEntry>> {
@@ -2128,6 +2187,35 @@ fn correction_identity_exists(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aggregates_daily_usage_by_local_date() {
+        let days = aggregate_daily_usage(vec![
+            (
+                "2026-11-01T09:00:00".to_string(),
+                "React 컴포넌트 고쳐 줘".to_string(),
+                3000,
+            ),
+            ("2026-11-01T18:30:00".to_string(), "  ".to_string(), 1000),
+            ("2026-10-31T23:59:59".to_string(), "안녕".to_string(), -5),
+            (
+                "2026-11-01T20:00:00".to_string(),
+                "두 단어".to_string(),
+                1500,
+            ),
+        ]);
+        assert_eq!(days.len(), 2);
+        assert_eq!(days[0].date, "2026-10-31");
+        assert_eq!(
+            (days[0].entries, days[0].words, days[0].duration_ms),
+            (1, 1, 0)
+        );
+        assert_eq!(days[1].date, "2026-11-01");
+        assert_eq!(
+            (days[1].entries, days[1].words, days[1].duration_ms),
+            (2, 6, 4500)
+        );
+    }
 
     #[test]
     fn app_config_defaults_missing_custom_stt_api_key() {

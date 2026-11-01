@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Search, Copy, Trash2, MoreHorizontal } from 'lucide-react'
 import { spring } from '../../lib/animations'
+import { toYmd, parseYmd } from '../../lib/usageStats'
 import { useAppStore, type HistoryEntry } from '../../stores/appStore'
 import { addCorrectionRule, clearHistory, getCorrectionRules } from '../../lib/tauri'
 import { toast } from '../toast-service'
@@ -13,7 +14,7 @@ export function History() {
   const history = useAppStore((s) => s.history)
   const setHistory = useAppStore((s) => s.setHistory)
   const setCorrectionRules = useAppStore((s) => s.setCorrectionRules)
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [search, setSearch] = useState('')
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [menuEntryId, setMenuEntryId] = useState<number | null>(null)
@@ -106,28 +107,32 @@ export function History() {
   // Group by date
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>()
+    const now = new Date()
+    const today = toYmd(now)
+    const yesterday = toYmd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
+    const longDate = new Intl.DateTimeFormat(i18n?.language || 'en', { dateStyle: 'long' })
     for (const entry of filtered) {
       const date = entry.created_at.split('T')[0] || entry.created_at.split(' ')[0]
-      const today = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
       const label =
-        date === today ? t('history.today') : date === yesterday ? t('history.yesterday') : date
+        date === today
+          ? t('history.today')
+          : date === yesterday
+            ? t('history.yesterday')
+            : /^\d{4}-\d{2}-\d{2}$/.test(date)
+              ? longDate.format(parseYmd(date))
+              : date
       if (!map.has(label)) map.set(label, [])
       map.get(label)!.push(entry)
     }
     return map
-  }, [filtered, t])
+  }, [filtered, t, i18n?.language])
 
   return (
-    <div className="w-full h-full bg-bg-primary text-text-primary flex flex-col">
+    <div className="mx-auto flex min-h-full w-full max-w-[960px] flex-col bg-bg-primary px-8 pt-9 pb-6 text-text-primary">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
-        <h2 className="text-[15px] font-medium">{t('history.title')}</h2>
-      </div>
-
-      {/* Search — jelly focus */}
-      <div className="px-5 py-3">
-        <div className="relative">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="m-0 text-[28px] font-bold tracking-[-0.03em]">{t('history.title')}</h1>
+        <div className="relative w-[260px] max-w-[45%]">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
@@ -136,14 +141,13 @@ export function History() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('history.searchPlaceholder')}
-            className="w-full pl-8 pr-3 py-2.5 bg-bg-secondary border border-border rounded-[14px] text-[13px] text-text-primary outline-none focus:ring-2 focus:ring-jelly-primary focus:border-jelly-primary transition-all jelly-btn"
-            style={{ transform: 'none' }}
+            className="h-9 w-full rounded-full border border-transparent bg-bg-secondary pl-8 pr-3 text-[13px] text-text-primary outline-none transition-colors focus:border-border-focus focus:bg-bg-primary"
           />
         </div>
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
+      <div className="flex-1 pt-2 pb-4">
         {filtered.length === 0 ? (
           <p className="text-center text-text-tertiary text-[13px] py-12">
             {search ? (
@@ -159,27 +163,28 @@ export function History() {
         ) : (
           <AnimatePresence>
             {Array.from(grouped.entries()).map(([label, entries]) => (
-              <div key={label} className="mb-4">
-                <h3 className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider mb-2 px-1 pb-1 border-b border-border">
+              <div key={label} className="mt-6">
+                <h3 className="m-0 mb-2 px-0.5 text-[12px] font-medium text-text-tertiary">
                   {label}
                 </h3>
-                <div className="space-y-0.5">
+                <div className="divide-y divide-border rounded-[12px] border border-border">
                   {entries.map((entry) => (
                     <motion.div
                       key={entry.id}
-                      whileHover={{ scale: 1.01 }}
-                      transition={spring.jellyGentle}
-                      className="group flex items-start gap-3 px-3 py-2.5 rounded-[10px] hover:bg-bg-secondary transition-colors"
+                      className="group flex items-start gap-4 px-4 py-3 transition-colors first:rounded-t-[12px] last:rounded-b-[12px] hover:bg-bg-secondary/60"
                     >
+                      <span className="w-[52px] shrink-0 pt-[3px] text-[12px] tabular-nums text-text-tertiary">
+                        {entry.created_at.split('T')[1]?.slice(0, 5) || ''}
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] text-text-primary leading-relaxed">
+                        <p className="m-0 text-[13.5px] text-text-primary leading-relaxed">
                           {entry.polished_text}
                         </p>
                         <AppContextMeta
                           iconKey={entry.context_icon_key}
                           family={entry.context_family}
                           label={entry.context_label}
-                          time={entry.created_at.split('T')[1]?.slice(0, 5) || ''}
+                          time=""
                           providerKind={entry.provider_kind}
                           browserAccessStatus={entry.browser_access_status}
                         />
@@ -254,7 +259,7 @@ export function History() {
 
       {/* Clear button — jelly */}
       {history.length > 0 && (
-        <div className="space-y-2 border-t border-border px-5 py-3">
+        <div className="space-y-2 pt-2">
           {confirmingClear && (
             <div className="rounded-[10px] border border-error/20 bg-error/10 px-3 py-2">
               <p className="text-[12px] leading-relaxed text-text-secondary">
@@ -278,16 +283,16 @@ export function History() {
               </div>
             </div>
           )}
-          <motion.button
-            onClick={() => setConfirmingClear(true)}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scaleX: 1.06, scaleY: 0.94 }}
-            transition={spring.jellyGentle}
-            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-[10px] py-2 text-[12px] text-text-tertiary transition-colors hover:text-error jelly-btn"
-          >
-            <Trash2 size={12} />
-            {t('history.clearAll')}
-          </motion.button>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-[8px] border-none bg-transparent px-2.5 py-1.5 text-[12px] text-text-tertiary transition-colors hover:bg-bg-secondary hover:text-error"
+            >
+              <Trash2 size={12} />
+              {t('history.clearAll')}
+            </button>
+          </div>
         </div>
       )}
       {correctionEntry && (

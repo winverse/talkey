@@ -11,7 +11,7 @@ export function SegmentedControl({ options, value, onChange }: Props) {
   const id = useId()
 
   return (
-    <div className="flex bg-bg-tertiary/50 rounded-[10px] p-0.5 gap-0.5">
+    <div className="flex bg-bg-secondary rounded-[10px] p-[3px] gap-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -25,8 +25,8 @@ export function SegmentedControl({ options, value, onChange }: Props) {
           {value === opt.value && (
             <motion.div
               layoutId={`segment-bg-${id}`}
-              className="absolute inset-0 rounded-[8px] jelly-nav-active"
-              transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+              className="absolute inset-0 rounded-[8px] bg-bg-primary shadow-sm dark:bg-bg-tertiary"
+              transition={{ type: 'spring', stiffness: 500, damping: 34 }}
             />
           )}
           <span className="relative z-10">{opt.label}</span>

@@ -490,6 +490,19 @@ export async function getHistory(limit: number, offset: number): Promise<History
   return invoke('get_history', { limit, offset })
 }
 
+export interface DailyUsage {
+  /** Local date `YYYY-MM-DD` */
+  date: string
+  entries: number
+  words: number
+  chars: number
+  duration_ms: number
+}
+
+export async function getDailyUsage(): Promise<DailyUsage[]> {
+  return invoke('get_daily_usage')
+}
+
 export async function clearHistory(): Promise<void> {
   return invoke('clear_history')
 }

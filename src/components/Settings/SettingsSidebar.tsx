@@ -1,7 +1,5 @@
 import { Settings, Mic, Sparkles, BookOpen, Info, LayoutGrid } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { spring } from '../../lib/animations'
 
 const PANES = [
   { id: 'general', labelKey: 'settings.general', icon: Settings },
@@ -17,44 +15,34 @@ export type PaneId = (typeof PANES)[number]['id']
 interface Props {
   activePane: PaneId
   onSelect: (id: PaneId) => void
+  /** The main window has a dedicated Dictionary page, so the modal hides this pane. */
+  hideDictionary?: boolean
 }
 
-export function SettingsSidebar({ activePane, onSelect }: Props) {
+export function SettingsSidebar({ activePane, onSelect, hideDictionary = false }: Props) {
   const { t } = useTranslation()
+  const panes = hideDictionary ? PANES.filter((p) => p.id !== 'dictionary') : PANES
 
   return (
-    <div className="w-[200px] h-full jelly-surface-flat border-r border-border flex flex-col py-4 px-2 gap-0.5">
-      <h2 className="text-[13px] font-semibold text-text-primary px-3 pb-3">
-        {t('settings.title')}
-      </h2>
-      {PANES.map((pane) => {
+    <div className="flex h-full w-[214px] shrink-0 flex-col gap-0.5 bg-bg-sidebar px-3 py-5">
+      {panes.map((pane) => {
         const Icon = pane.icon
         const isActive = activePane === pane.id
         return (
-          <motion.button
+          <button
             key={pane.id}
+            type="button"
             onClick={() => onSelect(pane.id)}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scaleX: 1.05, scaleY: 0.95 }}
-            transition={spring.jellyGentle}
-            className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-[8px] text-[13px] border-none cursor-pointer transition-colors text-left relative ${
+            aria-current={isActive ? 'page' : undefined}
+            className={`flex h-9 w-full items-center gap-2.5 rounded-[8px] border-none px-3 text-left text-[13.5px] cursor-pointer transition-colors ${
               isActive
-                ? 'text-text-primary font-medium'
-                : 'bg-transparent text-text-secondary hover:text-text-primary'
+                ? 'jelly-nav-active font-medium text-text-primary'
+                : 'bg-transparent text-text-secondary hover:bg-black/[0.04] hover:text-text-primary dark:hover:bg-white/[0.05]'
             }`}
           >
-            {isActive && (
-              <motion.div
-                layoutId="settings-nav-indicator"
-                className="absolute inset-0 jelly-nav-active"
-                transition={spring.jellyGentle}
-              />
-            )}
-            <span className="relative z-10 flex items-center gap-2.5">
-              <Icon size={16} />
-              {t(pane.labelKey)}
-            </span>
-          </motion.button>
+            <Icon size={16} strokeWidth={isActive ? 2.1 : 1.8} />
+            {t(pane.labelKey)}
+          </button>
         )
       })}
     </div>
