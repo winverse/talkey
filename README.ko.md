@@ -101,6 +101,8 @@ curl -X POST localhost:8000/v1/models/deepdml/faster-whisper-large-v3-turbo-ct2
 
    그다음 시스템 설정에서 Talkey에 마이크와 손쉬운 사용 권한을 줍니다.
 
+   macOS에서는 API 키를 키체인이 아니라 `~/Library/Application Support/com.winverse.talkey/credentials.json`에 저장합니다(본인만 읽을 수 있는 권한 600). 직접 서명하거나 ad-hoc 서명한 빌드는 Apple Team ID가 없어서, 키체인을 쓰면 빌드할 때마다 접근 허용을 다시 묻기 때문입니다. 이전 빌드가 키체인에 저장한 키는 처음 읽을 때 이 파일로 옮겨집니다. Windows는 계속 자격 증명 관리자를 씁니다.
+
 개발할 때는 `npm run tauri dev`를 씁니다.
 
 ## 출처와 라이선스

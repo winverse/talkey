@@ -101,6 +101,8 @@ There are no signed releases yet. Build Talkey yourself:
 
    Then allow Microphone and Accessibility access for Talkey in System Settings.
 
+   On macOS, API keys are stored in `~/Library/Application Support/com.winverse.talkey/credentials.json` (readable only by you, permission 600), not in the keychain. A self-signed or ad-hoc build has no Apple Team ID, so the keychain would ask for permission again after every rebuild. Keys saved in the keychain by an earlier build are moved to the file the first time they are read. Windows keeps using Credential Manager.
+
 For development, run `npm run tauri dev`.
 
 ## Credits and license
