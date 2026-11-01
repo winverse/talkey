@@ -25,6 +25,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import { AppLogo } from '../AppLogo'
+import { llmModelLabel } from '../../lib/engineLabels'
 import { ContextAdaptationApps } from './ContextAdaptationApps'
 import { TranslationTargets } from './TranslationTargets'
 import { AppStyleMappingDialog } from './AppStyleMappingDialog'
@@ -52,6 +53,10 @@ export function LlmPane() {
 
   const models = useAppStore((s) => s.llmModels)
   const setModels = useAppStore((s) => s.setLlmModels)
+  // Claude has a fixed, fetchable model list: pick from it instead of typing an id.
+  const useModelSelect = config.llm_provider === 'claude' && models.length > 0
+  const modelOptions =
+    config.llm_model && !models.includes(config.llm_model) ? [config.llm_model, ...models] : models
   const [fetchingModels, setFetchingModels] = useState(false)
   const [testErrorMessage, setTestErrorMessage] = useState<string | null>(null)
   const [credentialErrorMessage, setCredentialErrorMessage] = useState<string | null>(null)
@@ -164,6 +169,12 @@ export function LlmPane() {
     },
     [config.llm_provider, isCloud, requiresApiKey],
   )
+
+  const changeModel = (model: string) => {
+    updateConfig({ llm_model: model })
+    setLlmLatencyMs(null)
+    setTestErrorMessage(null)
+  }
 
   const doFetchModels = useCallback(
     async (apiKey: string, provider: string, baseUrl: string) => {
@@ -342,22 +353,41 @@ export function LlmPane() {
           <FormField label={t('settings.model')}>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input
-                  list="llm-model-list"
-                  value={config.llm_model}
-                  onChange={(e) => {
-                    updateConfig({ llm_model: e.target.value })
-                    setLlmLatencyMs(null)
-                    setTestErrorMessage(null)
-                  }}
-                  placeholder={t('settings.llmModelPlaceholder')}
-                  className="w-full px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
-                />
-                <datalist id="llm-model-list">
-                  {models.map((m) => (
-                    <option key={m} value={m} />
-                  ))}
-                </datalist>
+                {useModelSelect ? (
+                  <>
+                    <select
+                      aria-label={t('settings.model')}
+                      value={config.llm_model}
+                      onChange={(e) => changeModel(e.target.value)}
+                      className="w-full appearance-none pl-3 pr-9 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors cursor-pointer"
+                    >
+                      {modelOptions.map((m) => (
+                        <option key={m} value={m}>
+                          {llmModelLabel(m) === m ? m : `${llmModelLabel(m)} · ${m}`}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <input
+                      list="llm-model-list"
+                      value={config.llm_model}
+                      onChange={(e) => changeModel(e.target.value)}
+                      placeholder={t('settings.llmModelPlaceholder')}
+                      className="w-full px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
+                    />
+                    <datalist id="llm-model-list">
+                      {models.map((m) => (
+                        <option key={m} value={m} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
               </div>
               <button
                 onClick={() => doFetchModels(llmApiKey, config.llm_provider, config.llm_base_url)}
