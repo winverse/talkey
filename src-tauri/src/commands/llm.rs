@@ -196,12 +196,106 @@ pub async fn fetch_llm_models(
     }
 
     models.sort();
+    if crate::llm::protocol::detect_api_kind(&provider, &base_url)
+        == crate::llm::protocol::LlmApiKind::AnthropicMessages
+    {
+        models = latest_claude_models(models);
+    }
     Ok(models)
+}
+
+/// Claude families offered in the model picker, fastest first.
+const CLAUDE_PICKER_FAMILIES: [&str; 3] = ["haiku", "sonnet", "opus"];
+
+/// Parses `claude-<family>-<major>[-<minor>][-<date>]` into the family and
+/// version. Claude 3 names (`claude-3-5-sonnet-…`) and other families
+/// return `None`.
+fn claude_family_version(model: &str) -> Option<(&'static str, (u32, u32))> {
+    let mut parts = model.strip_prefix("claude-")?.split('-');
+    let family_name = parts.next()?;
+    let family = CLAUDE_PICKER_FAMILIES
+        .into_iter()
+        .find(|family| *family == family_name)?;
+    let major = parts.next()?.parse::<u32>().ok()?;
+    // A date suffix such as claude-sonnet-4-20250514 is not a minor version.
+    let minor = parts
+        .next()
+        .and_then(|part| part.parse::<u32>().ok())
+        .filter(|minor| *minor < 100)
+        .unwrap_or(0);
+    Some((family, (major, minor)))
+}
+
+/// Keeps only the newest Haiku, Sonnet and Opus from Anthropic's model list,
+/// so older generations and other families (such as Fable) are not offered.
+/// Returns the list unchanged when none of its names can be parsed.
+fn latest_claude_models(models: Vec<String>) -> Vec<String> {
+    let mut latest: Vec<String> = Vec::new();
+    for family in CLAUDE_PICKER_FAMILIES {
+        let newest = models
+            .iter()
+            .filter_map(|model| {
+                claude_family_version(model)
+                    .filter(|(found, _)| *found == family)
+                    .map(|(_, version)| (version, model))
+            })
+            // Same version: prefer the alias without a date suffix.
+            .max_by(|(a, a_model), (b, b_model)| {
+                a.cmp(b).then_with(|| b_model.len().cmp(&a_model.len()))
+            });
+        if let Some((_, model)) = newest {
+            latest.push(model.clone());
+        }
+    }
+    if latest.is_empty() {
+        models
+    } else {
+        latest
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn claude_picker_keeps_only_the_newest_haiku_sonnet_and_opus() {
+        // The list api.anthropic.com returned on 2026-11-01.
+        let models = [
+            "claude-haiku-5-5",
+            "claude-sonnet-5-5",
+            "claude-opus-5-5",
+            "claude-fable-5-1",
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-fable-5",
+            "claude-opus-4-8",
+            "claude-opus-4-7",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "claude-opus-4-5-20251101",
+            "claude-haiku-4-5-20251001",
+            "claude-sonnet-4-5-20250929",
+        ]
+        .map(String::from)
+        .to_vec();
+
+        assert_eq!(
+            latest_claude_models(models),
+            ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]
+        );
+    }
+
+    #[test]
+    fn claude_picker_prefers_aliases_and_keeps_unknown_lists() {
+        let models = ["claude-haiku-4-5-20251001", "claude-haiku-4-5"]
+            .map(String::from)
+            .to_vec();
+        assert_eq!(latest_claude_models(models), ["claude-haiku-4-5"]);
+
+        let proxy = ["glm-4.6", "kimi-k2"].map(String::from).to_vec();
+        assert_eq!(latest_claude_models(proxy.clone()), proxy);
+    }
 
     #[test]
     fn managed_cloud_access_requires_active_appsumo_license() {
