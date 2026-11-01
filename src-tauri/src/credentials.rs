@@ -4,7 +4,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::storage::AppConfig;
 
-const SERVICE_NAME: &str = "OpenTypeless";
+const SERVICE_NAME: &str = "Talkey";
+/// Keychain service used by OpenTypeless, the app Talkey is based on. Secrets
+/// found there are copied to `SERVICE_NAME` on first read.
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+const LEGACY_SERVICE_NAME: &str = "OpenTypeless";
 const API_KEY_ACCOUNT_SUFFIX: &str = "api_key";
 const STORED_CREDENTIAL_VERSION: u8 = 1;
 const CLOUD_SESSION_NAMESPACE: &str = "session";
@@ -133,6 +137,11 @@ fn system_entry(account: &str) -> Result<keyring::Entry> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn legacy_entry(account: &str) -> Result<keyring::Entry> {
+    keyring::Entry::new(LEGACY_SERVICE_NAME, account).context("open legacy credential vault")
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn write_system_secret(account: &str, secret: &str) -> Result<()> {
     system_entry(account)?
         .set_password(secret)
@@ -150,9 +159,28 @@ fn write_system_secret(_account: &str, _secret: &str) -> Result<()> {
 fn read_system_secret(account: &str) -> Result<Option<String>> {
     match system_entry(account)?.get_password() {
         Ok(secret) => Ok(Some(secret)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => Ok(import_legacy_secret(account)),
         Err(error) => Err(anyhow!("read system credential vault {account}: {error}")),
     }
+}
+
+/// Copies a secret saved by OpenTypeless into the Talkey vault. Failures are
+/// logged and treated as "no secret" so a missing legacy entry never blocks.
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn import_legacy_secret(account: &str) -> Option<String> {
+    let secret = match legacy_entry(account).ok()?.get_password() {
+        Ok(secret) => secret,
+        Err(keyring::Error::NoEntry) => return None,
+        Err(error) => {
+            tracing::warn!("Failed to read OpenTypeless credential {account}: {error}");
+            return None;
+        }
+    };
+    match write_system_secret(account, &secret) {
+        Ok(()) => tracing::info!("Imported credential {account} from OpenTypeless"),
+        Err(error) => tracing::warn!("Failed to import credential {account}: {error:#}"),
+    }
+    Some(secret)
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
@@ -165,8 +193,13 @@ fn read_system_secret(_account: &str) -> Result<Option<String>> {
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn delete_system_secret(account: &str) -> Result<()> {
     match system_entry(account)?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => {}
+        Err(error) => return Err(anyhow!("delete system credential vault {account}: {error}")),
+    }
+    // Remove the OpenTypeless copy too, or the next read would import it again.
+    match legacy_entry(account)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(anyhow!("delete system credential vault {account}: {error}")),
+        Err(error) => Err(anyhow!("delete legacy credential vault {account}: {error}")),
     }
 }
 

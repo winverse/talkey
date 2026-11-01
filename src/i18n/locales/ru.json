@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenTypeless",
+    "name": "Talkey",
     "tagline": "Голосовой ввод с ИИ",
     "freeBadge": "Free"
   },
@@ -63,7 +63,7 @@
     "openLlmSettings": "Настройки"
   },
   "home": {
-    "welcome": "Добро пожаловать в OpenTypeless",
+    "welcome": "Добро пожаловать в Talkey",
     "description": "Удерживайте {{hotkey}}, чтобы начать запись голоса. Ваша речь будет распознана и при необходимости обработана ИИ.",
     "totalRecordings": "Всего записей",
     "today": "Сегодня",
@@ -157,11 +157,11 @@
     },
     "steps": {
       "welcome": "Добро пожаловать",
-      "welcomeSub": "Настройте OpenTypeless за несколько шагов",
+      "welcomeSub": "Настройте Talkey за несколько шагов",
       "signIn": "Войти",
       "signInSub": "Подключите аккаунт для начала работы",
       "chooseMode": "Выберите режим",
-      "chooseModeSub": "Выберите, как вы хотите использовать OpenTypeless",
+      "chooseModeSub": "Выберите, как вы хотите использовать Talkey",
       "speechRecognition": "Распознавание речи",
       "speechRecognitionSub": "Настройте службу STT",
       "aiPolish": "Обработка ИИ",
@@ -226,7 +226,7 @@
       "appWritingModesSub": "В Scenes можно изменить режимы по умолчанию для почты, чатов, документов и других форматов."
     },
     "permissions": {
-      "subtitle": "OpenTypeless запрашивает доступ только когда он нужен функции.",
+      "subtitle": "Talkey запрашивает доступ только когда он нужен функции.",
       "microphone": "Микрофон",
       "microphoneDesc": "Записывать ваш голос.",
       "textOutput": "Вывод текста",
@@ -390,7 +390,7 @@
     "test": "Проверить",
     "connectionSuccess": "Подключение успешно",
     "connectionFailed": "Не удалось подключиться",
-    "storedLocally": "Хранится локально на вашем устройстве. Никогда не передаётся на серверы OpenTypeless.",
+    "storedLocally": "Хранится локально на вашем устройстве. Никогда не передаётся на серверы Talkey.",
     "credentialSaveFailed": "Не удалось сохранить API-ключ в системном хранилище. {{details}}",
     "sttLanguage": "Язык",
     "model": "Модель",
@@ -427,6 +427,7 @@
     "moveTranslationTargetDown": "Переместить язык перевода вниз",
     "aboutDescription": "Инструмент голосового ввода с открытым исходным кодом. Говорите, чтобы писать — превращайте голос в обработанный текст в реальном времени.",
     "openSource": "Открытый исходный код",
+    "basedOn": "Based on",
     "license": "Лицензия",
     "mit": "MIT",
     "github": "GitHub",

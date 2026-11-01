@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenTypeless",
+    "name": "Talkey",
     "tagline": "AI-Spracheingabe",
     "freeBadge": "Free"
   },
@@ -63,7 +63,7 @@
     "openLlmSettings": "Einstellungen"
   },
   "home": {
-    "welcome": "Willkommen bei OpenTypeless",
+    "welcome": "Willkommen bei Talkey",
     "description": "Halten Sie {{hotkey}} gedrückt, um die Sprachaufnahme zu starten. Ihre Sprache wird transkribiert und optional durch KI geglättet.",
     "totalRecordings": "Gesamtaufnahmen",
     "today": "Heute",
@@ -157,11 +157,11 @@
     },
     "steps": {
       "welcome": "Willkommen",
-      "welcomeSub": "Richten Sie OpenTypeless in wenigen Schritten ein",
+      "welcomeSub": "Richten Sie Talkey in wenigen Schritten ein",
       "signIn": "Anmelden",
       "signInSub": "Verbinden Sie Ihr Konto, um loszulegen",
       "chooseMode": "Modus wählen",
-      "chooseModeSub": "Wählen Sie, wie Sie OpenTypeless verwenden möchten",
+      "chooseModeSub": "Wählen Sie, wie Sie Talkey verwenden möchten",
       "speechRecognition": "Spracherkennung",
       "speechRecognitionSub": "Konfigurieren Sie Ihren STT-Dienst",
       "aiPolish": "KI-Glättung",
@@ -226,7 +226,7 @@
       "appWritingModesSub": "Bearbeite Standardmodi fuer E-Mail, Chat, Dokumente und weitere Schreibweisen in Szenen."
     },
     "permissions": {
-      "subtitle": "OpenTypeless fragt nur nach Zugriff, wenn eine Funktion ihn braucht.",
+      "subtitle": "Talkey fragt nur nach Zugriff, wenn eine Funktion ihn braucht.",
       "microphone": "Mikrofon",
       "microphoneDesc": "Ihre Stimme aufnehmen.",
       "textOutput": "Textausgabe",
@@ -390,7 +390,7 @@
     "test": "Testen",
     "connectionSuccess": "Verbindung erfolgreich",
     "connectionFailed": "Verbindung fehlgeschlagen",
-    "storedLocally": "Lokal auf Ihrem Gerät gespeichert. Wird niemals an OpenTypeless-Server gesendet.",
+    "storedLocally": "Lokal auf Ihrem Gerät gespeichert. Wird niemals an Talkey-Server gesendet.",
     "credentialSaveFailed": "API-Schlüssel konnte nicht im OS-Tresor gespeichert werden. {{details}}",
     "sttLanguage": "Sprache",
     "model": "Modell",
@@ -427,6 +427,7 @@
     "moveTranslationTargetDown": "Übersetzungsziel nach unten verschieben",
     "aboutDescription": "Open-Source-AI-Spracheingabe-Tool. Sprechen Sie, um zu schreiben — verwandeln Sie Ihre Stimme in Echtzeit in geglätteten Text.",
     "openSource": "Open Source",
+    "basedOn": "Based on",
     "license": "Lizenz",
     "mit": "MIT",
     "github": "GitHub",

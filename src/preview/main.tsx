@@ -121,12 +121,16 @@ mockIPC(
         return empty ? [] : dictionary
       case 'get_correction_rules':
         return []
+      case 'fetch_llm_models':
+        return ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1']
+      case 'read_credential':
+        return 'preview-key'
       case 'check_accessibility_permission':
         return true
       case 'get_hotkey_registration_error':
         return null
       case 'plugin:app|version':
-        return '1.1.64'
+        return '0.1.0'
       default:
         return null
     }

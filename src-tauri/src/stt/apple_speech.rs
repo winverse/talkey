@@ -56,7 +56,7 @@ impl AppleSpeechAvailability {
                 AppleSpeechAuthorizationStatus::Denied => (
                     false,
                     Some("speech_permission_denied".to_string()),
-                    Some("Speech Recognition permission is denied for OpenTypeless".to_string()),
+                    Some("Speech Recognition permission is denied for Talkey".to_string()),
                 ),
                 AppleSpeechAuthorizationStatus::Restricted => (
                     false,
@@ -259,7 +259,7 @@ mod platform {
         match status {
             AppleSpeechAuthorizationStatus::Authorized => return Ok(status),
             AppleSpeechAuthorizationStatus::Denied => {
-                bail!("Speech Recognition permission is denied for OpenTypeless")
+                bail!("Speech Recognition permission is denied for Talkey")
             }
             AppleSpeechAuthorizationStatus::Restricted => {
                 bail!("Speech Recognition is restricted on this Mac")
@@ -286,7 +286,7 @@ mod platform {
                 Ok(AppleSpeechAuthorizationStatus::Authorized)
             }
             Ok(AppleSpeechAuthorizationStatus::Denied) => {
-                bail!("Speech Recognition permission is denied for OpenTypeless")
+                bail!("Speech Recognition permission is denied for Talkey")
             }
             Ok(AppleSpeechAuthorizationStatus::Restricted) => {
                 bail!("Speech Recognition is restricted on this Mac")

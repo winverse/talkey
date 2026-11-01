@@ -45,9 +45,7 @@ describe('deep-link OAuth callback', () => {
     vi.resetModules()
     const secondModule = await import('../deep-link')
     await secondModule.initDeepLinkListener()
-    await mocks.deepLinkHandler?.([
-      `opentypeless://auth/callback?code=${'c'.repeat(43)}&state=${state}`,
-    ])
+    await mocks.deepLinkHandler?.([`talkey://auth/callback?code=${'c'.repeat(43)}&state=${state}`])
 
     expect(mocks.handleDeepLinkToken).not.toHaveBeenCalled()
     expect(mocks.fetch).not.toHaveBeenCalled()
@@ -69,7 +67,7 @@ describe('deep-link OAuth callback', () => {
     const state = module.generateOAuthState()
 
     const handled = await module.handleDeepLinkUrl(
-      `opentypeless://auth/callback?code=${'c'.repeat(43)}&state=${state}`,
+      `talkey://auth/callback?code=${'c'.repeat(43)}&state=${state}`,
     )
 
     expect(handled).toBe(true)
@@ -111,7 +109,7 @@ describe('deep-link OAuth callback', () => {
     const state = module.generateOAuthState()
 
     const handled = await module.handleDeepLinkUrl(
-      `opentypeless://auth/callback?token=stolen-session-token&state=${state}`,
+      `talkey://auth/callback?token=stolen-session-token&state=${state}`,
     )
 
     expect(handled).toBe(false)
@@ -122,7 +120,7 @@ describe('deep-link OAuth callback', () => {
   it('keeps the local verifier private and sends it only to the HTTPS exchange', async () => {
     const module = await import('../deep-link')
     const state = module.generateOAuthState()
-    const url = `opentypeless://auth/callback?code=${'d'.repeat(43)}&state=${state}`
+    const url = `talkey://auth/callback?code=${'d'.repeat(43)}&state=${state}`
 
     await module.handleDeepLinkUrl(url)
 
@@ -142,16 +140,12 @@ describe('deep-link OAuth callback', () => {
     const verifier = module.getPendingOAuthVerifier(newState)
 
     await expect(
-      module.handleDeepLinkUrl(
-        `opentypeless://auth/callback?code=${'c'.repeat(43)}&state=${oldState}`,
-      ),
+      module.handleDeepLinkUrl(`talkey://auth/callback?code=${'c'.repeat(43)}&state=${oldState}`),
     ).resolves.toBe(false)
     expect(mocks.fetch).not.toHaveBeenCalled()
     expect(module.getPendingOAuthVerifier(newState)).toBe(verifier)
     await expect(
-      module.handleDeepLinkUrl(
-        `opentypeless://auth/callback?code=${'d'.repeat(43)}&state=${newState}`,
-      ),
+      module.handleDeepLinkUrl(`talkey://auth/callback?code=${'d'.repeat(43)}&state=${newState}`),
     ).resolves.toBe(true)
     expect(mocks.handleDeepLinkToken).toHaveBeenCalledOnce()
   })
@@ -167,7 +161,7 @@ describe('deep-link OAuth callback', () => {
     const module = await import('../deep-link')
     const oldState = module.generateOAuthState()
     const pending = module.handleDeepLinkUrl(
-      `opentypeless://auth/callback?code=${'c'.repeat(43)}&state=${oldState}`,
+      `talkey://auth/callback?code=${'c'.repeat(43)}&state=${oldState}`,
     )
     module.clearOAuthState()
     vi.mocked(crypto.randomUUID).mockReturnValueOnce('22222222-2222-4222-8222-222222222222')
@@ -191,7 +185,7 @@ describe('deep-link OAuth callback', () => {
     )
     const module = await import('../deep-link')
     const state = module.generateOAuthState()
-    const callback = `opentypeless://auth/callback?code=${'c'.repeat(43)}&state=${state}`
+    const callback = `talkey://auth/callback?code=${'c'.repeat(43)}&state=${state}`
     const first = module.handleDeepLinkUrl(callback)
     const second = module.handleDeepLinkUrl(callback)
     finish(Response.json({ token: 'valid-token-12345' }))
@@ -212,12 +206,10 @@ describe('deep-link OAuth callback', () => {
     const module = await import('../deep-link')
     const state = module.generateOAuthState()
     const pending = module.handleDeepLinkUrl(
-      `opentypeless://auth/callback?code=${'c'.repeat(43)}&state=${state}`,
+      `talkey://auth/callback?code=${'c'.repeat(43)}&state=${state}`,
     )
     await expect(
-      module.handleDeepLinkUrl(
-        `opentypeless://auth/callback?code=${'d'.repeat(43)}&state=${state}`,
-      ),
+      module.handleDeepLinkUrl(`talkey://auth/callback?code=${'d'.repeat(43)}&state=${state}`),
     ).resolves.toBe(false)
     expect(mocks.fetch).toHaveBeenCalledOnce()
     finish(Response.json({ token: 'valid-token-12345' }))

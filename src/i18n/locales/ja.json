@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenTypeless",
+    "name": "Talkey",
     "tagline": "AI音声入力",
     "freeBadge": "Free"
   },
@@ -63,7 +63,7 @@
     "openLlmSettings": "設定"
   },
   "home": {
-    "welcome": "OpenTypelessへようこそ",
+    "welcome": "Talkeyへようこそ",
     "description": "{{hotkey}}を長押しして音声録音を開始します。音声が文字起こしされ、AIによる整形が行われます。",
     "totalRecordings": "総録音回数",
     "today": "今日",
@@ -157,11 +157,11 @@
     },
     "steps": {
       "welcome": "ようこそ",
-      "welcomeSub": "いくつかのステップでOpenTypelessを設定しましょう",
+      "welcomeSub": "いくつかのステップでTalkeyを設定しましょう",
       "signIn": "サインイン",
       "signInSub": "アカウントに接続して始めましょう",
       "chooseMode": "モードを選択",
-      "chooseModeSub": "OpenTypelessの使用方法を選択してください",
+      "chooseModeSub": "Talkeyの使用方法を選択してください",
       "speechRecognition": "音声認識",
       "speechRecognitionSub": "STTサービスを設定します",
       "aiPolish": "AI整形",
@@ -226,7 +226,7 @@
       "appWritingModesSub": "Scenesでメール、チャット、ドキュメントなどの既定の書き方を編集できます。"
     },
     "permissions": {
-      "subtitle": "OpenTypelessは機能に必要なときだけアクセスを求めます。",
+      "subtitle": "Talkeyは機能に必要なときだけアクセスを求めます。",
       "microphone": "マイク",
       "microphoneDesc": "音声を録音します。",
       "textOutput": "テキスト出力",
@@ -390,7 +390,7 @@
     "test": "テスト",
     "connectionSuccess": "接続に成功しました",
     "connectionFailed": "接続に失敗しました",
-    "storedLocally": "お使いのデバイスにローカル保存されます。OpenTypelessサーバーには送信されません。",
+    "storedLocally": "お使いのデバイスにローカル保存されます。Talkeyサーバーには送信されません。",
     "credentialSaveFailed": "APIキーをOSの資格情報ストアに保存できませんでした。{{details}}",
     "sttLanguage": "言語",
     "model": "モデル",
@@ -427,6 +427,7 @@
     "moveTranslationTargetDown": "翻訳先を下へ移動",
     "aboutDescription": "オープンソースAI音声入力ツール。話して書く — 音声をリアルタイムで整形されたテキストに変換します。",
     "openSource": "オープンソース",
+    "basedOn": "Based on",
     "license": "ライセンス",
     "mit": "MIT",
     "github": "GitHub",

@@ -544,7 +544,7 @@ mod platform {
             let thread_handles = Arc::clone(&handles);
             let (status_tx, status_rx) = mpsc::channel();
             thread::Builder::new()
-                .name("opentypeless-native-hotkey-mac".to_string())
+                .name("talkey-native-hotkey-mac".to_string())
                 .spawn(move || {
                     run_event_tap_loop(bindings, hold_dictation, handler, thread_handles, status_tx)
                 })
@@ -967,7 +967,7 @@ mod platform {
             let startup = Arc::new(WindowsStartupState::new());
             let thread_startup = Arc::clone(&startup);
             let thread = thread::Builder::new()
-                .name("opentypeless-native-hotkey-win".to_string())
+                .name("talkey-native-hotkey-win".to_string())
                 .spawn(move || run_keyboard_hook_loop(bindings, handler, thread_startup, status_tx))
                 .map_err(|error| {
                     format!("Failed to spawn Windows native hotkey monitor thread: {error}")

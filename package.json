@@ -1,7 +1,7 @@
 {
-  "name": "opentypeless",
+  "name": "talkey",
   "private": true,
-  "version": "1.1.64",
+  "version": "0.1.0",
   "type": "module",
   "description": "AI-powered speech-to-text and text polishing desktop app",
   "keywords": [
@@ -14,13 +14,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/tover0314-w/opentypeless"
+    "url": "https://github.com/winverse/talkey"
   },
-  "homepage": "https://www.opentypeless.com",
+  "homepage": "https://github.com/winverse/talkey",
   "bugs": {
-    "url": "https://github.com/tover0314-w/opentypeless/issues"
+    "url": "https://github.com/winverse/talkey/issues"
   },
-  "author": "OpenTypeless Contributors",
+  "author": "winverse (based on OpenTypeless by OpenTypeless Contributors)",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

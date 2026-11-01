@@ -4,7 +4,13 @@ import i18n from '../../i18n'
 import { ExternalLink } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useAppStore } from '../../stores/appStore'
-import { APP_NAME, APP_VERSION, APP_REPO_URL, UI_LANGUAGES } from '../../lib/constants'
+import {
+  APP_NAME,
+  APP_VERSION,
+  APP_REPO_URL,
+  UI_LANGUAGES,
+  UPSTREAM_REPO_URL,
+} from '../../lib/constants'
 
 export function AboutPane() {
   const { t } = useTranslation()
@@ -53,6 +59,7 @@ export function AboutPane() {
       <SectionCard title={t('settings.openSource')}>
         <InfoRow label={t('settings.license')} value={t('settings.mit')} />
         <LinkRow label={t('settings.github')} url={APP_REPO_URL} linkText={t('settings.view')} />
+        <LinkRow label={t('settings.basedOn')} url={UPSTREAM_REPO_URL} linkText="OpenTypeless" />
         <InfoRow label={t('settings.framework')} value={t('settings.tauriReact')} />
       </SectionCard>
     </div>

@@ -765,11 +765,7 @@ body,
 
 /* Activity grid cells before the first recorded day */
 .grass-before {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--color-grass-0) 0 2px,
-    transparent 2px 4px
-  );
+  background: repeating-linear-gradient(135deg, var(--color-grass-0) 0 2px, transparent 2px 4px);
 }
 
 /* Keyboard key chip */

@@ -354,24 +354,18 @@ export function LlmPane() {
             <div className="flex gap-2">
               <div className="relative flex-1">
                 {useModelSelect ? (
-                  <>
-                    <select
-                      aria-label={t('settings.model')}
-                      value={config.llm_model}
-                      onChange={(e) => changeModel(e.target.value)}
-                      className="w-full appearance-none pl-3 pr-9 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors cursor-pointer"
-                    >
-                      {modelOptions.map((m) => (
-                        <option key={m} value={m}>
-                          {llmModelLabel(m) === m ? m : `${llmModelLabel(m)} · ${m}`}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary"
-                    />
-                  </>
+                  <select
+                    aria-label={t('settings.model')}
+                    value={config.llm_model}
+                    onChange={(e) => changeModel(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
+                  >
+                    {modelOptions.map((m) => (
+                      <option key={m} value={m}>
+                        {llmModelLabel(m) === m ? m : `${llmModelLabel(m)} · ${m}`}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <>
                     <input
