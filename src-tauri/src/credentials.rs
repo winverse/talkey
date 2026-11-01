@@ -143,6 +143,10 @@ fn legacy_entry(account: &str) -> Result<keyring::Entry> {
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn write_system_secret(account: &str, secret: &str) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    if let Some(path) = crate::credential_file::path() {
+        return crate::credential_file::write(&path, account, Some(secret));
+    }
     system_entry(account)?
         .set_password(secret)
         .with_context(|| format!("write system credential vault {account}"))
@@ -157,6 +161,38 @@ fn write_system_secret(_account: &str, _secret: &str) -> Result<()> {
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn read_system_secret(account: &str) -> Result<Option<String>> {
+    #[cfg(target_os = "macos")]
+    if let Some(path) = crate::credential_file::path() {
+        return read_file_secret(&path, account);
+    }
+    read_keychain_secret(account)
+}
+
+/// Reads a secret from the credential file. An account the file has never
+/// seen is moved from the keychain once (this can show one keychain prompt),
+/// and the keychain is not read for it again.
+#[cfg(target_os = "macos")]
+fn read_file_secret(path: &std::path::Path, account: &str) -> Result<Option<String>> {
+    use crate::credential_file::{self, Entry};
+
+    match credential_file::read(path, account)? {
+        Entry::Present(secret) => Ok(Some(secret)),
+        Entry::Absent => Ok(None),
+        Entry::Unknown => {
+            let secret = read_keychain_secret(account)?;
+            credential_file::write(path, account, secret.as_deref())?;
+            if secret.is_some() {
+                tracing::info!(
+                    "Moved credential {account} from the keychain to the credential file"
+                );
+            }
+            Ok(secret)
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn read_keychain_secret(account: &str) -> Result<Option<String>> {
     match system_entry(account)?.get_password() {
         Ok(secret) => Ok(Some(secret)),
         Err(keyring::Error::NoEntry) => Ok(import_legacy_secret(account)),
@@ -192,6 +228,12 @@ fn read_system_secret(_account: &str) -> Result<Option<String>> {
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn delete_system_secret(account: &str) -> Result<()> {
+    // Mark the account absent in the credential file. A keychain copy left by
+    // an older build is never read again, and deleting it could show a prompt.
+    #[cfg(target_os = "macos")]
+    if let Some(path) = crate::credential_file::path() {
+        return crate::credential_file::write(&path, account, None);
+    }
     match system_entry(account)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => {}
         Err(error) => return Err(anyhow!("delete system credential vault {account}: {error}")),

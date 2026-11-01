@@ -2,6 +2,7 @@ pub mod app_detector;
 pub mod audio;
 pub mod cloud_request;
 pub mod commands;
+pub mod credential_file;
 pub mod credentials;
 pub mod dictionary_io;
 pub mod error;
@@ -897,6 +898,18 @@ pub fn run() {
         }
     }
 
+    // The session token below is read before `.setup(...)`, so point the
+    // credential file at the app data folder first. Tauri's app_data_dir on
+    // macOS is ~/Library/Application Support/<identifier>.
+    #[cfg(target_os = "macos")]
+    if let Some(home) = std::env::var_os("HOME") {
+        credential_file::set_dir(
+            std::path::PathBuf::from(home)
+                .join("Library/Application Support")
+                .join(credential_file::APP_IDENTIFIER),
+        );
+    }
+
     // Builder-managed state exists before Tauri creates configured webviews.
     // Registering this in `.setup(...)` races the main renderer's first invoke on WebView2.
     let builder = with_restored_session_token(
@@ -952,6 +965,15 @@ pub fn run() {
                 Err(error) => tracing::warn!("Failed to import OpenTypeless data: {error}"),
             }
             std::fs::create_dir_all(&data_dir)?;
+            #[cfg(target_os = "macos")]
+            if credential_file::path().map(|path| path.parent() != Some(data_dir.as_path()))
+                == Some(true)
+            {
+                tracing::warn!(
+                    "Credential file folder differs from the app data folder {}",
+                    data_dir.display()
+                );
+            }
             let db_path = data_dir.join(legacy_migration::DB_FILE_NAME);
 
             // Initialize stores
