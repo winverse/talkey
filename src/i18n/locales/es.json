@@ -1,8 +1,7 @@
 {
   "app": {
     "name": "Talkey",
-    "tagline": "Entrada de voz con IA",
-    "freeBadge": "Free"
+    "tagline": "Entrada de voz con IA"
   },
   "nav": {
     "home": "Inicio",

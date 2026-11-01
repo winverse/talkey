@@ -1,8 +1,7 @@
 {
   "app": {
     "name": "Talkey",
-    "tagline": "Голосовой ввод с ИИ",
-    "freeBadge": "Free"
+    "tagline": "Голосовой ввод с ИИ"
   },
   "nav": {
     "home": "Главная",

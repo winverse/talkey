@@ -1,8 +1,7 @@
 {
   "app": {
     "name": "Talkey",
-    "tagline": "AI音声入力",
-    "freeBadge": "Free"
+    "tagline": "AI音声入力"
   },
   "nav": {
     "home": "ホーム",

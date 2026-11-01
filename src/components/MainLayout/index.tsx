@@ -28,9 +28,6 @@ export function MainLayout({ children }: Props) {
         <div className="flex items-center gap-2 px-4 pt-5 pb-5" data-tauri-drag-region>
           <img src={appIcon} alt="" className="h-[22px] w-[22px] rounded-[6px]" draggable={false} />
           <h1 className="text-[15px] font-semibold tracking-tight">{t('app.name')}</h1>
-          <span className="rounded-[5px] border border-border bg-bg-primary px-1.5 py-[1px] text-[10px] font-medium text-text-secondary">
-            {t('app.freeBadge')}
-          </span>
         </div>
 
         {/* Main navigation */}

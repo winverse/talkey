@@ -1,8 +1,7 @@
 {
   "app": {
     "name": "Talkey",
-    "tagline": "Saisie vocale IA",
-    "freeBadge": "Free"
+    "tagline": "Saisie vocale IA"
   },
   "nav": {
     "home": "Accueil",
