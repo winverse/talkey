@@ -97,7 +97,7 @@ describe('deep-link OAuth callback', () => {
     const state = module.generateOAuthState()
 
     const handled = await module.handleDeepLinkUrl(
-      `opentypeless:/auth/callback?code=${'c'.repeat(43)}&state=${state}`,
+      `talkey:/auth/callback?code=${'c'.repeat(43)}&state=${state}`,
     )
 
     expect(handled).toBe(true)
