@@ -324,7 +324,7 @@
     "shortcutMax": "Up to three shortcuts",
     "shortcutRollback": "The previous shortcuts were restored.",
     "disableAskHotkey": "Ask 단축키 비활성화",
-    "pressKeyCombination": "키 조합을 누르세요...",
+    "pressKeyCombination": "키 조합이나 오른쪽 수정키(⌘·⌥·⌃·⇧) 하나를 누르세요...",
     "clickToConfirm": "다시 클릭하여 확인하거나, 다른 조합을 누르세요",
     "holdToTalk": "누른 채 말하기",
     "toggleOnOff": "토글 켜기/끄기",

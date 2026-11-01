@@ -457,6 +457,13 @@ function normalizePrimary(value: string): string | null {
     altright: 'RightAlt',
     alt_right: 'RightAlt',
     'alt-right': 'RightAlt',
+    rightoption: 'RightAlt',
+    rightcommand: 'RightCommand',
+    rightcmd: 'RightCommand',
+    rightmeta: 'RightCommand',
+    rightctrl: 'RightCtrl',
+    rightcontrol: 'RightCtrl',
+    rightshift: 'RightShift',
   }
   if (nativePrimary[lower]) return nativePrimary[lower]
   if (named[lower]) return named[lower]

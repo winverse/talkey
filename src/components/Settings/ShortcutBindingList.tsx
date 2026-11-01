@@ -5,6 +5,7 @@ import { bindingFromHotkey, hotkeyFromBinding, isMacPlatform } from '../../store
 import type { HotkeyRole } from '../../lib/tauri'
 import type { ShortcutBinding } from '../../stores/appStore'
 import { pauseHotkey, resumeHotkey } from '../../lib/tauri'
+import { hotkeyLabel } from '../../lib/engineLabels'
 
 const STANDALONE_KEYS = new Set([
   'Space',
@@ -38,6 +39,15 @@ const STANDALONE_KEYS = new Set([
 
 const MAX_BINDINGS = 3
 
+/** Right-hand modifiers that can be used alone (native hotkey runtime). */
+const LONE_MODIFIER_CODES: Record<string, string> = {
+  MetaRight: 'RightCommand',
+  OSRight: 'RightCommand',
+  AltRight: 'RightAlt',
+  ControlRight: 'RightCtrl',
+  ShiftRight: 'RightShift',
+}
+
 interface HotkeyRecorderProps {
   value: string
   onSaved: (hotkey: string) => void
@@ -66,6 +76,9 @@ export function HotkeyRecorder({
   const autoConfirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoStarted = useRef(false)
   const recordingRef = useRef(false)
+  // Right-hand modifier pressed with nothing else yet; a release without any
+  // other key in between records it as a lone hotkey (e.g. RightCommand).
+  const loneModifier = useRef<string | null>(null)
 
   const clearTimer = useCallback(() => {
     if (!autoConfirmTimer.current) return
@@ -140,11 +153,14 @@ export function HotkeyRecorder({
       if (event.shiftKey) parts.push('Shift')
       if (!isMac && event.metaKey) parts.push('Meta')
 
-      if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
+      if (['Control', 'Shift', 'Alt', 'Meta', 'OS', 'AltGraph'].includes(event.key)) {
+        const lone = LONE_MODIFIER_CODES[event.code]
+        loneModifier.current = lone && parts.length <= 1 && !event.repeat ? lone : null
         setModifierHint(parts.length > 0 ? `${parts.join('+')}+...` : null)
         return
       }
 
+      loneModifier.current = null
       setModifierHint(null)
       const keyMap: Record<string, string> = {
         ' ': 'Space',
@@ -178,17 +194,32 @@ export function HotkeyRecorder({
     [confirmHotkey, isMac],
   )
 
+  const handleKeyUp = useCallback(
+    (event: KeyboardEvent) => {
+      setModifierHint(null)
+      const lone = loneModifier.current
+      loneModifier.current = null
+      if (!lone || LONE_MODIFIER_CODES[event.code] !== lone) return
+      event.preventDefault()
+      event.stopPropagation()
+      setPending(lone)
+      if (autoConfirmTimer.current) clearTimeout(autoConfirmTimer.current)
+      autoConfirmTimer.current = setTimeout(() => confirmHotkey(lone), 1500)
+    },
+    [confirmHotkey],
+  )
+
   useEffect(() => {
     if (!recording) return
-    const clearModifierHint = () => setModifierHint(null)
+    loneModifier.current = null
     window.addEventListener('keydown', handleKeyDown, true)
-    window.addEventListener('keyup', clearModifierHint, true)
+    window.addEventListener('keyup', handleKeyUp, true)
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true)
-      window.removeEventListener('keyup', clearModifierHint, true)
+      window.removeEventListener('keyup', handleKeyUp, true)
       clearTimer()
     }
-  }, [clearTimer, handleKeyDown, recording])
+  }, [clearTimer, handleKeyDown, handleKeyUp, recording])
 
   const handleClick = () => {
     if (disabled) return
@@ -214,7 +245,9 @@ export function HotkeyRecorder({
               : 'border-transparent bg-bg-secondary text-text-primary hover:border-border'
           }`}
         >
-          {recording ? pending || modifierHint || t('settings.pressKeyCombination') : value}
+          {recording
+            ? (pending && hotkeyLabel(pending)) || modifierHint || t('settings.pressKeyCombination')
+            : hotkeyLabel(value)}
         </button>
         {recording && onCancel && (
           <button

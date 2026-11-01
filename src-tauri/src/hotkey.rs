@@ -411,12 +411,19 @@ pub fn native_trigger_supported_on_platform(trigger: NativeHotkeyTrigger, platfo
             NativeHotkeyTrigger::Fn
                 | NativeHotkeyTrigger::FnSpace
                 | NativeHotkeyTrigger::FnLeftShift
+                | NativeHotkeyTrigger::RightAlt
+                | NativeHotkeyTrigger::RightCommand
+                | NativeHotkeyTrigger::RightCtrl
+                | NativeHotkeyTrigger::RightShift
         ),
         "windows" => matches!(
             trigger,
             NativeHotkeyTrigger::RightAlt
                 | NativeHotkeyTrigger::RightAltSpace
                 | NativeHotkeyTrigger::RightAltLeftShift
+                | NativeHotkeyTrigger::RightCommand
+                | NativeHotkeyTrigger::RightCtrl
+                | NativeHotkeyTrigger::RightShift
         ),
         _ => false,
     }
@@ -431,6 +438,9 @@ pub fn native_trigger_from_binding(
             "rightalt" | "right_alt" | "right-alt" | "altright" | "alt_right" | "alt-right" => {
                 Some(NativeHotkeyTrigger::RightAlt)
             }
+            "rightcommand" => Some(NativeHotkeyTrigger::RightCommand),
+            "rightctrl" => Some(NativeHotkeyTrigger::RightCtrl),
+            "rightshift" => Some(NativeHotkeyTrigger::RightShift),
             _ => None,
         };
     }
@@ -1469,9 +1479,17 @@ mod tests {
             NativeHotkeyTrigger::FnSpace,
             "macos"
         ));
-        assert!(!native_trigger_supported_on_platform(
-            NativeHotkeyTrigger::RightAlt,
+        assert!(native_trigger_supported_on_platform(
+            NativeHotkeyTrigger::RightCommand,
             "macos"
+        ));
+        assert!(!native_trigger_supported_on_platform(
+            NativeHotkeyTrigger::RightAltSpace,
+            "macos"
+        ));
+        assert!(native_trigger_supported_on_platform(
+            NativeHotkeyTrigger::RightCtrl,
+            "windows"
         ));
         assert!(native_trigger_supported_on_platform(
             NativeHotkeyTrigger::RightAltLeftShift,

@@ -325,7 +325,7 @@
     "shortcutMax": "Up to three shortcuts",
     "shortcutRollback": "The previous shortcuts were restored.",
     "disableAskHotkey": "Disable Ask shortcut",
-    "pressKeyCombination": "Press a key combination...",
+    "pressKeyCombination": "Press a key combination or a single right-side modifier...",
     "clickToConfirm": "Click again to confirm, or press another combination",
     "holdToTalk": "Hold to Talk",
     "toggleOnOff": "Press to start/stop",

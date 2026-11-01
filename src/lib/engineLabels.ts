@@ -55,10 +55,28 @@ const MODIFIER_LABELS: Record<string, string> = {
   Fn: 'Fn',
 }
 
+const PRIMARY_LABELS: Record<string, string> = {
+  RightCommand: isMac ? 'Right Cmd' : 'Right Win',
+  RightAlt: isMac ? 'Right Option' : 'Right Alt',
+  RightCtrl: 'Right Ctrl',
+  RightShift: 'Right Shift',
+  LeftShift: 'Left Shift',
+}
+
+function primaryLabel(primary: string): string {
+  return PRIMARY_LABELS[primary] ?? (primary.length === 1 ? primary.toUpperCase() : primary)
+}
+
 /** Key chips for a shortcut binding, e.g. ["Cmd", "Ctrl", "/"]. */
 export function bindingKeys(binding: ShortcutBinding | null | undefined): string[] {
   if (!binding || !binding.primary) return []
   const keys = binding.modifiers.map((m) => MODIFIER_LABELS[m] ?? m)
-  const primary = binding.primary.length === 1 ? binding.primary.toUpperCase() : binding.primary
-  return [...keys, primary]
+  return [...keys, primaryLabel(binding.primary)]
+}
+
+/** Readable hotkey string: "RightCommand" becomes "Right Cmd"; combos stay as typed. */
+export function hotkeyLabel(hotkey: string): string {
+  const parts = hotkey.split('+')
+  const last = parts.length - 1
+  return parts.map((part, i) => (i === last ? (PRIMARY_LABELS[part] ?? part) : part)).join('+')
 }

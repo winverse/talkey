@@ -857,9 +857,12 @@ fn normalize_hotkey_primary(value: &str) -> Option<String> {
         "arrowleft" | "left" => "Left".to_string(),
         "arrowright" | "right" => "Right".to_string(),
         "fn" | "function" => "Fn".to_string(),
-        "rightalt" | "right_alt" | "right-alt" | "altright" | "alt_right" | "alt-right" => {
-            "RightAlt".to_string()
-        }
+        "rightalt" | "right_alt" | "right-alt" | "altright" | "alt_right" | "alt-right"
+        | "rightoption" | "optionright" => "RightAlt".to_string(),
+        "rightcommand" | "rightcmd" | "commandright" | "rightmeta" | "metaright" | "rightsuper"
+        | "rightwin" => "RightCommand".to_string(),
+        "rightctrl" | "rightcontrol" | "controlright" | "ctrlright" => "RightCtrl".to_string(),
+        "rightshift" | "shiftright" => "RightShift".to_string(),
         "slash" | "/" => "/".to_string(),
         "backslash" | "\\" => "\\".to_string(),
         "period" | "." | "。" => ".".to_string(),

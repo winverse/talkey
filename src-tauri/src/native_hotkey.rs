@@ -11,6 +11,10 @@ pub enum NativeHotkeyTrigger {
     RightAlt,
     RightAltSpace,
     RightAltLeftShift,
+    /// Right Command on macOS, right Windows key on Windows.
+    RightCommand,
+    RightCtrl,
+    RightShift,
 }
 
 impl NativeHotkeyTrigger {
@@ -22,14 +26,30 @@ impl NativeHotkeyTrigger {
             Self::RightAlt => "RightAlt",
             Self::RightAltSpace => "RightAlt+Space",
             Self::RightAltLeftShift => "RightAlt+LeftShift",
+            Self::RightCommand => "RightCommand",
+            Self::RightCtrl => "RightCtrl",
+            Self::RightShift => "RightShift",
         }
     }
+
+    /// Bare right-hand modifiers (no combos). Every trigger in this list is
+    /// its own base.
+    #[cfg(target_os = "windows")]
+    const BARE_MODIFIERS: [NativeHotkeyTrigger; 4] = [
+        Self::RightAlt,
+        Self::RightCommand,
+        Self::RightCtrl,
+        Self::RightShift,
+    ];
 
     #[cfg(any(target_os = "macos", target_os = "windows", test))]
     fn base(self) -> NativeHotkeyTrigger {
         match self {
             Self::Fn | Self::FnSpace | Self::FnLeftShift => Self::Fn,
             Self::RightAlt | Self::RightAltSpace | Self::RightAltLeftShift => Self::RightAlt,
+            Self::RightCommand => Self::RightCommand,
+            Self::RightCtrl => Self::RightCtrl,
+            Self::RightShift => Self::RightShift,
         }
     }
 
@@ -38,7 +58,9 @@ impl NativeHotkeyTrigger {
         match self {
             Self::FnSpace | Self::RightAltSpace => Some(NativeComboKey::Space),
             Self::FnLeftShift | Self::RightAltLeftShift => Some(NativeComboKey::LeftShift),
-            Self::Fn | Self::RightAlt => None,
+            Self::Fn | Self::RightAlt | Self::RightCommand | Self::RightCtrl | Self::RightShift => {
+                None
+            }
         }
     }
 
@@ -149,15 +171,28 @@ impl NativeMonitoredBinding {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", test))]
-fn monitored_bindings_for_base(
+fn monitored_bindings_for_bases(
     bindings: Vec<NativeHotkeyBinding>,
-    base: NativeHotkeyTrigger,
+    bases: &[NativeHotkeyTrigger],
 ) -> Vec<NativeMonitoredBinding> {
     bindings
         .into_iter()
-        .filter(|binding| binding.trigger.base() == base)
+        .filter(|binding| bases.contains(&binding.trigger.base()))
         .map(NativeMonitoredBinding::new)
         .collect()
+}
+
+/// Bases that have at least one binding, in a stable order.
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
+fn bound_bases(bindings: &[NativeMonitoredBinding]) -> Vec<NativeHotkeyTrigger> {
+    let mut bases = Vec::new();
+    for binding in bindings {
+        let base = binding.binding.trigger.base();
+        if !bases.contains(&base) {
+            bases.push(base);
+        }
+    }
+    bases
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", test))]
@@ -208,6 +243,10 @@ struct NativeComboState {
     pending_base_press: bool,
     combo_used: bool,
     hold_base: bool,
+    /// Wait for the release (or the hold grace period) before firing a bare
+    /// base, so the key still works as a modifier: Right Command + C must not
+    /// start dictation.
+    defer_bare: bool,
     edge_generation: u64,
 }
 
@@ -246,7 +285,7 @@ fn dispatch_native_base_edge(
     if pressed {
         state.base_pressed = true;
         state.combo_used = false;
-        state.pending_base_press = has_combo_bindings(bindings, base);
+        state.pending_base_press = state.defer_bare || has_combo_bindings(bindings, base);
         if state.pending_base_press {
             return true;
         }
@@ -280,6 +319,28 @@ fn dispatch_native_base_edge(
 
     state.base_pressed = false;
     dispatch_matching_bindings(bindings, base, false, handler)
+}
+
+/// Another key went down while a deferred base is held: the user is typing a
+/// regular shortcut (e.g. Right Command + C), so the bare base must not fire.
+/// An already active hold is stopped.
+#[cfg(any(target_os = "macos", test))]
+fn cancel_native_base_on_other_key(
+    state: &mut NativeComboState,
+    bindings: &[NativeMonitoredBinding],
+    base: NativeHotkeyTrigger,
+    handler: &NativeHotkeyHandler,
+) {
+    if !state.defer_bare || !state.base_pressed || state.combo_used {
+        return;
+    }
+    let active = !state.pending_base_press;
+    state.combo_used = true;
+    state.pending_base_press = false;
+    state.edge_generation = state.edge_generation.wrapping_add(1);
+    if active {
+        let _ = dispatch_matching_bindings(bindings, base, false, handler);
+    }
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", test))]
@@ -316,9 +377,10 @@ fn dispatch_native_combo_edge(
 #[cfg(target_os = "macos")]
 mod platform {
     use super::{
-        activate_pending_hold_base, dispatch_native_base_edge, dispatch_native_combo_edge,
-        monitored_bindings_for_base, NativeComboKey, NativeComboState, NativeHotkeyHandler,
-        NativeHotkeyTrigger, NativeMonitoredBinding,
+        activate_pending_hold_base, bound_bases, cancel_native_base_on_other_key,
+        dispatch_native_base_edge, dispatch_native_combo_edge, monitored_bindings_for_bases,
+        NativeComboKey, NativeComboState, NativeHotkeyHandler, NativeHotkeyTrigger,
+        NativeMonitoredBinding,
     };
     use std::ffi::c_void;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -368,9 +430,27 @@ mod platform {
     const KEYBOARD_EVENT_KEYCODE: CgEventField = 9;
     const FLAG_MASK_SECONDARY_FN: CgEventFlags = 0x0080_0000;
     const FLAG_MASK_SHIFT: CgEventFlags = 0x0002_0000;
+    // Device-dependent flag bits (IOLLEvent.h NX_DEVICER*KEYMASK) tell the
+    // right-hand modifier apart from the left one.
+    const FLAG_MASK_DEVICE_RIGHT_SHIFT: CgEventFlags = 0x0000_0004;
+    const FLAG_MASK_DEVICE_RIGHT_COMMAND: CgEventFlags = 0x0000_0010;
+    const FLAG_MASK_DEVICE_RIGHT_OPTION: CgEventFlags = 0x0000_0040;
+    const FLAG_MASK_DEVICE_RIGHT_CONTROL: CgEventFlags = 0x0000_2000;
     const FN_KEYCODE: i64 = 63;
     const SPACE_KEYCODE: i64 = 49;
     const LEFT_SHIFT_KEYCODE: i64 = 56;
+    const RIGHT_COMMAND_KEYCODE: i64 = 54;
+    const RIGHT_SHIFT_KEYCODE: i64 = 60;
+    const RIGHT_OPTION_KEYCODE: i64 = 61;
+    const RIGHT_CONTROL_KEYCODE: i64 = 62;
+
+    const MAC_BASES: [NativeHotkeyTrigger; 5] = [
+        NativeHotkeyTrigger::Fn,
+        NativeHotkeyTrigger::RightAlt,
+        NativeHotkeyTrigger::RightCommand,
+        NativeHotkeyTrigger::RightCtrl,
+        NativeHotkeyTrigger::RightShift,
+    ];
 
     type CgEventTapCallBack = extern "C" fn(
         proxy: *mut c_void,
@@ -453,9 +533,11 @@ mod platform {
             hold_dictation: bool,
             handler: NativeHotkeyHandler,
         ) -> Result<Self, String> {
-            let bindings = monitored_bindings_for_base(bindings, NativeHotkeyTrigger::Fn);
+            let bindings = monitored_bindings_for_bases(bindings, &MAC_BASES);
             if bindings.is_empty() {
-                return Err("macOS native hotkeys currently support Fn only".to_string());
+                return Err(
+                    "macOS native hotkeys support Fn and right-hand modifier keys only".to_string(),
+                );
             }
 
             let handles = Arc::new(MacShutdownHandles::new());
@@ -500,11 +582,35 @@ mod platform {
         }
     }
 
+    type SharedComboState = Arc<Mutex<NativeComboState>>;
+
     struct CallbackContext {
         bindings: Arc<Vec<NativeMonitoredBinding>>,
         handler: NativeHotkeyHandler,
         handles: Arc<MacShutdownHandles>,
-        state: Arc<Mutex<NativeComboState>>,
+        /// One combo state per bound base key (Fn, Right Command, ...).
+        states: Vec<(NativeHotkeyTrigger, SharedComboState)>,
+    }
+
+    impl CallbackContext {
+        fn state_for(&self, base: NativeHotkeyTrigger) -> Option<&SharedComboState> {
+            self.states
+                .iter()
+                .find(|(candidate, _)| *candidate == base)
+                .map(|(_, state)| state)
+        }
+
+        /// A key other than `except` went down: deferred bases that are being
+        /// held become part of a regular shortcut and must not fire.
+        fn cancel_deferred_bases(&self, except: Option<NativeHotkeyTrigger>) {
+            for (base, state) in &self.states {
+                if Some(*base) == except {
+                    continue;
+                }
+                let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+                cancel_native_base_on_other_key(&mut state, &self.bindings, *base, &self.handler);
+            }
+        }
     }
 
     fn run_event_tap_loop(
@@ -514,19 +620,29 @@ mod platform {
         handles: Arc<MacShutdownHandles>,
         status_tx: mpsc::Sender<Result<(), String>>,
     ) {
-        let hold_base = hold_dictation
-            && bindings.iter().any(|binding| {
-                binding.binding.trigger == NativeHotkeyTrigger::Fn
-                    && binding.binding.role == crate::hotkey::HotkeyRole::Dictation
-            });
+        let states = bound_bases(&bindings)
+            .into_iter()
+            .map(|base| {
+                let hold_base = hold_dictation
+                    && bindings.iter().any(|binding| {
+                        binding.binding.trigger == base
+                            && binding.binding.role == crate::hotkey::HotkeyRole::Dictation
+                    });
+                let state = NativeComboState {
+                    hold_base,
+                    // Right-hand modifiers keep working as modifiers; only a
+                    // lone press triggers the hotkey.
+                    defer_bare: base != NativeHotkeyTrigger::Fn,
+                    ..NativeComboState::default()
+                };
+                (base, Arc::new(Mutex::new(state)))
+            })
+            .collect();
         let context = Box::into_raw(Box::new(CallbackContext {
             bindings: Arc::new(bindings),
             handler,
             handles: Arc::clone(&handles),
-            state: Arc::new(Mutex::new(NativeComboState {
-                hold_base,
-                ..NativeComboState::default()
-            })),
+            states,
         }));
         let mask: CgEventMask = (1u64 << FLAGS_CHANGED) | (1u64 << KEY_DOWN) | (1u64 << KEY_UP);
 
@@ -612,16 +728,17 @@ mod platform {
         match event_type {
             TAP_DISABLED_BY_TIMEOUT | TAP_DISABLED_BY_USER_INPUT => {
                 // macOS can disable the tap while a key is held. Clear the
-                // captured state so a missing key-up cannot leave Fn stuck.
-                let mut state = context.state.lock().unwrap_or_else(|e| e.into_inner());
-                let _ = dispatch_native_base_edge(
-                    &mut state,
-                    &context.bindings,
-                    NativeHotkeyTrigger::Fn,
-                    false,
-                    &context.handler,
-                );
-                drop(state);
+                // captured state so a missing key-up cannot leave a key stuck.
+                for (base, state) in &context.states {
+                    let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+                    let _ = dispatch_native_base_edge(
+                        &mut state,
+                        &context.bindings,
+                        *base,
+                        false,
+                        &context.handler,
+                    );
+                }
                 if let Some(tap) = context
                     .handles
                     .tap
@@ -644,83 +761,126 @@ mod platform {
     fn handle_flags_changed(context: &CallbackContext, event: CgEventRef) {
         let keycode = unsafe { CGEventGetIntegerValueField(event, KEYBOARD_EVENT_KEYCODE) };
         let flags = unsafe { CGEventGetFlags(event) };
-        if keycode == FN_KEYCODE {
-            let pressed = (flags & FLAG_MASK_SECONDARY_FN) != 0;
-            let mut state = context.state.lock().unwrap_or_else(|e| e.into_inner());
-            let was_pressed = state.base_pressed;
-            let _ = dispatch_native_base_edge(
-                &mut state,
-                &context.bindings,
-                NativeHotkeyTrigger::Fn,
-                pressed,
-                &context.handler,
-            );
-            if pressed && !was_pressed && state.hold_base && state.pending_base_press {
-                let generation = state.edge_generation;
-                let state = Arc::clone(&context.state);
-                let bindings = Arc::clone(&context.bindings);
-                let handler = Arc::clone(&context.handler);
-                let handles = Arc::clone(&context.handles);
-                if let Err(error) = thread::Builder::new()
-                    .name("opentypeless-fn-hold-delay".to_string())
-                    .spawn(move || {
-                        thread::sleep(HOLD_COMBO_GRACE_PERIOD);
-                        if handles.cancelled.load(Ordering::SeqCst) {
-                            return;
-                        }
-                        let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
-                        let _ = activate_pending_hold_base(
-                            &mut state,
-                            &bindings,
-                            NativeHotkeyTrigger::Fn,
-                            generation,
-                            &handler,
-                        );
-                    })
-                {
-                    tracing::warn!("Failed to schedule Fn hold hotkey: {error}");
-                }
+        let base_edge = match keycode {
+            FN_KEYCODE => Some((NativeHotkeyTrigger::Fn, FLAG_MASK_SECONDARY_FN)),
+            RIGHT_COMMAND_KEYCODE => Some((
+                NativeHotkeyTrigger::RightCommand,
+                FLAG_MASK_DEVICE_RIGHT_COMMAND,
+            )),
+            RIGHT_OPTION_KEYCODE => {
+                Some((NativeHotkeyTrigger::RightAlt, FLAG_MASK_DEVICE_RIGHT_OPTION))
+            }
+            RIGHT_CONTROL_KEYCODE => Some((
+                NativeHotkeyTrigger::RightCtrl,
+                FLAG_MASK_DEVICE_RIGHT_CONTROL,
+            )),
+            RIGHT_SHIFT_KEYCODE => Some((
+                NativeHotkeyTrigger::RightShift,
+                FLAG_MASK_DEVICE_RIGHT_SHIFT,
+            )),
+            _ => None,
+        };
+
+        if let Some((base, mask)) = base_edge {
+            let pressed = (flags & mask) != 0;
+            if pressed {
+                context.cancel_deferred_bases(Some(base));
+            }
+            if let Some(state) = context.state_for(base) {
+                handle_base_edge(context, base, state, pressed);
             }
             return;
         }
 
         if keycode == LEFT_SHIFT_KEYCODE {
             let pressed = (flags & FLAG_MASK_SHIFT) != 0;
-            let mut state = context.state.lock().unwrap_or_else(|e| e.into_inner());
-            let _ = dispatch_native_combo_edge(
-                &mut state,
-                &context.bindings,
-                NativeHotkeyTrigger::Fn,
-                NativeComboKey::LeftShift,
-                pressed,
-                &context.handler,
-            );
+            if let Some(state) = context.state_for(NativeHotkeyTrigger::Fn) {
+                let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+                let _ = dispatch_native_combo_edge(
+                    &mut state,
+                    &context.bindings,
+                    NativeHotkeyTrigger::Fn,
+                    NativeComboKey::LeftShift,
+                    pressed,
+                    &context.handler,
+                );
+            }
+        }
+
+        // Any other modifier change (left Command, Caps Lock, ...) while a
+        // right-hand modifier is held means a regular shortcut.
+        context.cancel_deferred_bases(None);
+    }
+
+    fn handle_base_edge(
+        context: &CallbackContext,
+        base: NativeHotkeyTrigger,
+        shared_state: &SharedComboState,
+        pressed: bool,
+    ) {
+        let mut state = shared_state.lock().unwrap_or_else(|e| e.into_inner());
+        let was_pressed = state.base_pressed;
+        let _ = dispatch_native_base_edge(
+            &mut state,
+            &context.bindings,
+            base,
+            pressed,
+            &context.handler,
+        );
+        if pressed && !was_pressed && state.hold_base && state.pending_base_press {
+            let generation = state.edge_generation;
+            let state = Arc::clone(shared_state);
+            let bindings = Arc::clone(&context.bindings);
+            let handler = Arc::clone(&context.handler);
+            let handles = Arc::clone(&context.handles);
+            if let Err(error) = thread::Builder::new()
+                .name("talkey-hotkey-hold-delay".to_string())
+                .spawn(move || {
+                    thread::sleep(HOLD_COMBO_GRACE_PERIOD);
+                    if handles.cancelled.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+                    let _ = activate_pending_hold_base(
+                        &mut state, &bindings, base, generation, &handler,
+                    );
+                })
+            {
+                tracing::warn!(
+                    "Failed to schedule {} hold hotkey: {error}",
+                    base.canonical()
+                );
+            }
         }
     }
 
     fn handle_key_event(context: &CallbackContext, event: CgEventRef, pressed: bool) {
         let keycode = unsafe { CGEventGetIntegerValueField(event, KEYBOARD_EVENT_KEYCODE) };
-        if keycode != SPACE_KEYCODE {
-            return;
+        if keycode == SPACE_KEYCODE {
+            if let Some(state) = context.state_for(NativeHotkeyTrigger::Fn) {
+                let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+                let _ = dispatch_native_combo_edge(
+                    &mut state,
+                    &context.bindings,
+                    NativeHotkeyTrigger::Fn,
+                    NativeComboKey::Space,
+                    pressed,
+                    &context.handler,
+                );
+            }
         }
-        let mut state = context.state.lock().unwrap_or_else(|e| e.into_inner());
-        let _ = dispatch_native_combo_edge(
-            &mut state,
-            &context.bindings,
-            NativeHotkeyTrigger::Fn,
-            NativeComboKey::Space,
-            pressed,
-            &context.handler,
-        );
+        if pressed {
+            context.cancel_deferred_bases(None);
+        }
     }
 }
 
 #[cfg(target_os = "windows")]
 mod platform {
     use super::{
-        dispatch_native_base_edge, dispatch_native_combo_edge, monitored_bindings_for_base,
-        NativeComboKey, NativeComboState, NativeHotkeyHandler, NativeHotkeyTrigger,
-        NativeMonitoredBinding,
+        bound_bases, dispatch_native_base_edge, dispatch_native_combo_edge,
+        monitored_bindings_for_bases, NativeComboKey, NativeComboState, NativeHotkeyHandler,
+        NativeHotkeyTrigger, NativeMonitoredBinding,
     };
     use std::ptr;
     use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, Ordering as AtomicOrdering};
@@ -745,7 +905,10 @@ mod platform {
     const WM_SYSKEYUP: usize = 0x0105;
     const VK_SPACE: u32 = 0x20;
     const VK_LSHIFT: u32 = 0xA0;
+    const VK_RSHIFT: u32 = 0xA1;
+    const VK_RCONTROL: u32 = 0xA3;
     const VK_RMENU: u32 = 0xA5;
+    const VK_RWIN: u32 = 0x5C;
 
     static HOOK_CONTEXT: AtomicPtr<CallbackContext> = AtomicPtr::new(ptr::null_mut());
 
@@ -792,9 +955,12 @@ mod platform {
             _hold_dictation: bool,
             handler: NativeHotkeyHandler,
         ) -> Result<Self, String> {
-            let bindings = monitored_bindings_for_base(bindings, NativeHotkeyTrigger::RightAlt);
+            let bindings =
+                monitored_bindings_for_bases(bindings, &NativeHotkeyTrigger::BARE_MODIFIERS);
             if bindings.is_empty() {
-                return Err("Windows native hotkeys currently support RightAlt only".to_string());
+                return Err(
+                    "Windows native hotkeys support right-hand modifier keys only".to_string(),
+                );
             }
 
             let (status_tx, status_rx) = mpsc::channel();
@@ -855,7 +1021,20 @@ mod platform {
         bindings: Vec<NativeMonitoredBinding>,
         handler: NativeHotkeyHandler,
         hook: std::sync::Mutex<Option<HHOOK>>,
-        state: std::sync::Mutex<NativeComboState>,
+        /// One combo state per bound base key (RightAlt, RightCtrl, ...).
+        states: Vec<(NativeHotkeyTrigger, std::sync::Mutex<NativeComboState>)>,
+    }
+
+    impl CallbackContext {
+        fn state_for(
+            &self,
+            base: NativeHotkeyTrigger,
+        ) -> Option<&std::sync::Mutex<NativeComboState>> {
+            self.states
+                .iter()
+                .find(|(candidate, _)| *candidate == base)
+                .map(|(_, state)| state)
+        }
     }
 
     unsafe impl Send for CallbackContext {}
@@ -881,11 +1060,15 @@ mod platform {
                 return;
             }
 
+            let states = bound_bases(&bindings)
+                .into_iter()
+                .map(|base| (base, std::sync::Mutex::new(NativeComboState::default())))
+                .collect();
             let context = Box::into_raw(Box::new(CallbackContext {
                 bindings,
                 handler,
                 hook: std::sync::Mutex::new(None),
-                state: std::sync::Mutex::new(NativeComboState::default()),
+                states,
             }));
             HOOK_CONTEXT.store(context, AtomicOrdering::SeqCst);
 
@@ -1002,33 +1185,44 @@ mod platform {
             return false;
         };
 
-        let mut state = context.state.lock().unwrap_or_else(|e| e.into_inner());
-        match vk_code {
-            VK_RMENU => dispatch_native_base_edge(
+        let base = match vk_code {
+            VK_RMENU => Some(NativeHotkeyTrigger::RightAlt),
+            VK_RWIN => Some(NativeHotkeyTrigger::RightCommand),
+            VK_RCONTROL => Some(NativeHotkeyTrigger::RightCtrl),
+            VK_RSHIFT => Some(NativeHotkeyTrigger::RightShift),
+            _ => None,
+        };
+        if let Some(base) = base {
+            let Some(state) = context.state_for(base) else {
+                return false;
+            };
+            let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+            return dispatch_native_base_edge(
                 &mut state,
                 &context.bindings,
-                NativeHotkeyTrigger::RightAlt,
+                base,
                 pressed,
                 &context.handler,
-            ),
-            VK_SPACE => dispatch_native_combo_edge(
-                &mut state,
-                &context.bindings,
-                NativeHotkeyTrigger::RightAlt,
-                NativeComboKey::Space,
-                pressed,
-                &context.handler,
-            ),
-            VK_LSHIFT => dispatch_native_combo_edge(
-                &mut state,
-                &context.bindings,
-                NativeHotkeyTrigger::RightAlt,
-                NativeComboKey::LeftShift,
-                pressed,
-                &context.handler,
-            ),
-            _ => false,
+            );
         }
+
+        let combo = match vk_code {
+            VK_SPACE => NativeComboKey::Space,
+            VK_LSHIFT => NativeComboKey::LeftShift,
+            _ => return false,
+        };
+        let Some(state) = context.state_for(NativeHotkeyTrigger::RightAlt) else {
+            return false;
+        };
+        let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+        dispatch_native_combo_edge(
+            &mut state,
+            &context.bindings,
+            NativeHotkeyTrigger::RightAlt,
+            combo,
+            pressed,
+            &context.handler,
+        )
     }
 
     unsafe fn callback_context<'a>() -> Option<&'a CallbackContext> {
@@ -1083,6 +1277,138 @@ mod tests {
         let handler: Arc<dyn Fn(NativeHotkeyEvent) + Send + Sync> = Arc::new(|_| {});
 
         assert!(runtime.install(Vec::new(), false, handler).is_ok());
+    }
+
+    type RecordedEvents = Arc<Mutex<Vec<(crate::hotkey::HotkeyRole, ShortcutState)>>>;
+
+    fn right_command_bindings() -> (
+        Vec<NativeMonitoredBinding>,
+        RecordedEvents,
+        NativeHotkeyHandler,
+    ) {
+        let bindings = monitored_bindings_for_bases(
+            vec![NativeHotkeyBinding {
+                role: crate::hotkey::HotkeyRole::Dictation,
+                index: 0,
+                trigger: NativeHotkeyTrigger::RightCommand,
+            }],
+            &[NativeHotkeyTrigger::RightCommand],
+        );
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&events);
+        let handler: NativeHotkeyHandler = Arc::new(move |event| {
+            captured.lock().unwrap().push((event.role, event.state));
+        });
+        (bindings, events, handler)
+    }
+
+    #[test]
+    fn deferred_modifier_fires_on_lone_tap() {
+        let (bindings, events, handler) = right_command_bindings();
+        let base = NativeHotkeyTrigger::RightCommand;
+        let mut state = NativeComboState {
+            defer_bare: true,
+            ..NativeComboState::default()
+        };
+
+        dispatch_native_base_edge(&mut state, &bindings, base, true, &handler);
+        assert!(events.lock().unwrap().is_empty(), "press alone must wait");
+        dispatch_native_base_edge(&mut state, &bindings, base, false, &handler);
+
+        assert_eq!(
+            *events.lock().unwrap(),
+            vec![
+                (crate::hotkey::HotkeyRole::Dictation, ShortcutState::Pressed),
+                (
+                    crate::hotkey::HotkeyRole::Dictation,
+                    ShortcutState::Released
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn deferred_modifier_used_in_shortcut_does_not_fire() {
+        let (bindings, events, handler) = right_command_bindings();
+        let base = NativeHotkeyTrigger::RightCommand;
+        let mut state = NativeComboState {
+            defer_bare: true,
+            ..NativeComboState::default()
+        };
+
+        dispatch_native_base_edge(&mut state, &bindings, base, true, &handler);
+        cancel_native_base_on_other_key(&mut state, &bindings, base, &handler);
+        dispatch_native_base_edge(&mut state, &bindings, base, false, &handler);
+        assert!(events.lock().unwrap().is_empty());
+
+        // The next lone tap works again.
+        dispatch_native_base_edge(&mut state, &bindings, base, true, &handler);
+        dispatch_native_base_edge(&mut state, &bindings, base, false, &handler);
+        assert_eq!(events.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn deferred_modifier_hold_stops_when_another_key_is_pressed() {
+        let (bindings, events, handler) = right_command_bindings();
+        let base = NativeHotkeyTrigger::RightCommand;
+        let mut state = NativeComboState {
+            defer_bare: true,
+            hold_base: true,
+            ..NativeComboState::default()
+        };
+
+        dispatch_native_base_edge(&mut state, &bindings, base, true, &handler);
+        let generation = state.edge_generation;
+        assert!(activate_pending_hold_base(
+            &mut state, &bindings, base, generation, &handler
+        ));
+        cancel_native_base_on_other_key(&mut state, &bindings, base, &handler);
+        dispatch_native_base_edge(&mut state, &bindings, base, false, &handler);
+
+        assert_eq!(
+            *events.lock().unwrap(),
+            vec![
+                (crate::hotkey::HotkeyRole::Dictation, ShortcutState::Pressed),
+                (
+                    crate::hotkey::HotkeyRole::Dictation,
+                    ShortcutState::Released
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn bound_bases_lists_each_base_once() {
+        let bindings = monitored_bindings_for_bases(
+            vec![
+                NativeHotkeyBinding {
+                    role: crate::hotkey::HotkeyRole::Dictation,
+                    index: 0,
+                    trigger: NativeHotkeyTrigger::Fn,
+                },
+                NativeHotkeyBinding {
+                    role: crate::hotkey::HotkeyRole::Ask,
+                    index: 0,
+                    trigger: NativeHotkeyTrigger::FnSpace,
+                },
+                NativeHotkeyBinding {
+                    role: crate::hotkey::HotkeyRole::TranslateSelection,
+                    index: 0,
+                    trigger: NativeHotkeyTrigger::RightShift,
+                },
+                NativeHotkeyBinding {
+                    role: crate::hotkey::HotkeyRole::TranslateSelection,
+                    index: 1,
+                    trigger: NativeHotkeyTrigger::RightAltSpace,
+                },
+            ],
+            &[NativeHotkeyTrigger::Fn, NativeHotkeyTrigger::RightShift],
+        );
+        assert_eq!(bindings.len(), 3);
+        assert_eq!(
+            bound_bases(&bindings),
+            vec![NativeHotkeyTrigger::Fn, NativeHotkeyTrigger::RightShift]
+        );
     }
 
     #[test]
