@@ -48,6 +48,37 @@ const LONE_MODIFIER_CODES: Record<string, string> = {
   ShiftRight: 'RightShift',
 }
 
+/** Keys (by `event.code`) that can follow a held right-hand modifier. */
+const COMBO_CODE_KEYS: Record<string, string> = {
+  Space: 'Space',
+  Slash: '/',
+  Period: '.',
+  Comma: ',',
+  Semicolon: ';',
+  Quote: "'",
+  BracketLeft: '[',
+  BracketRight: ']',
+  Minus: '-',
+  Equal: '=',
+  Backquote: '`',
+  Backslash: '\\',
+  Enter: 'Enter',
+  Tab: 'Tab',
+  Escape: 'Escape',
+  Backspace: 'Backspace',
+  ArrowUp: 'Up',
+  ArrowDown: 'Down',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
+}
+
+function comboKeyFromCode(code: string): string | null {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3)
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5)
+  if (/^F([1-9]|1[0-2])$/.test(code)) return code
+  return COMBO_CODE_KEYS[code] ?? null
+}
+
 interface HotkeyRecorderProps {
   value: string
   onSaved: (hotkey: string) => void
@@ -79,6 +110,9 @@ export function HotkeyRecorder({
   // Right-hand modifier pressed with nothing else yet; a release without any
   // other key in between records it as a lone hotkey (e.g. RightCommand).
   const loneModifier = useRef<string | null>(null)
+  // Right-hand modifier currently held alone; the next key makes a native
+  // combo such as RightCommand+/ instead of the generic Command+/.
+  const heldRight = useRef<string | null>(null)
 
   const clearTimer = useCallback(() => {
     if (!autoConfirmTimer.current) return
@@ -104,6 +138,15 @@ export function HotkeyRecorder({
       resumeHotkey().catch((resumeError) => setError(String(resumeError)))
     },
     [clearTimer, onSaved, validateHotkey],
+  )
+
+  const proposeHotkey = useCallback(
+    (combo: string) => {
+      setPending(combo)
+      if (autoConfirmTimer.current) clearTimeout(autoConfirmTimer.current)
+      autoConfirmTimer.current = setTimeout(() => confirmHotkey(combo), 1500)
+    },
+    [confirmHotkey],
   )
 
   const cancelRecording = useCallback(() => {
@@ -155,6 +198,20 @@ export function HotkeyRecorder({
 
       if (['Control', 'Shift', 'Alt', 'Meta', 'OS', 'AltGraph'].includes(event.key)) {
         const lone = LONE_MODIFIER_CODES[event.code]
+        if (lone) {
+          heldRight.current = parts.length <= 1 ? lone : null
+        } else if (
+          event.code === 'ShiftLeft' &&
+          heldRight.current &&
+          heldRight.current !== 'RightShift' &&
+          parts.length === 2
+        ) {
+          loneModifier.current = null
+          proposeHotkey(`${heldRight.current}+LeftShift`)
+          return
+        } else {
+          heldRight.current = null
+        }
         loneModifier.current = lone && parts.length <= 1 && !event.repeat ? lone : null
         setModifierHint(parts.length > 0 ? `${parts.join('+')}+...` : null)
         return
@@ -162,6 +219,13 @@ export function HotkeyRecorder({
 
       loneModifier.current = null
       setModifierHint(null)
+      if (heldRight.current && parts.length === 1) {
+        const comboKey = comboKeyFromCode(event.code)
+        if (comboKey) {
+          proposeHotkey(`${heldRight.current}+${comboKey}`)
+          return
+        }
+      }
       const keyMap: Record<string, string> = {
         ' ': 'Space',
         Tab: 'Tab',
@@ -186,32 +250,31 @@ export function HotkeyRecorder({
       if (parts.length === 0 && !STANDALONE_KEYS.has(keyName)) return
 
       parts.push(keyName)
-      const combo = parts.join('+')
-      setPending(combo)
-      if (autoConfirmTimer.current) clearTimeout(autoConfirmTimer.current)
-      autoConfirmTimer.current = setTimeout(() => confirmHotkey(combo), 1500)
+      proposeHotkey(parts.join('+'))
     },
-    [confirmHotkey, isMac],
+    [isMac, proposeHotkey],
   )
 
   const handleKeyUp = useCallback(
     (event: KeyboardEvent) => {
       setModifierHint(null)
+      if (heldRight.current && LONE_MODIFIER_CODES[event.code] === heldRight.current) {
+        heldRight.current = null
+      }
       const lone = loneModifier.current
       loneModifier.current = null
       if (!lone || LONE_MODIFIER_CODES[event.code] !== lone) return
       event.preventDefault()
       event.stopPropagation()
-      setPending(lone)
-      if (autoConfirmTimer.current) clearTimeout(autoConfirmTimer.current)
-      autoConfirmTimer.current = setTimeout(() => confirmHotkey(lone), 1500)
+      proposeHotkey(lone)
     },
-    [confirmHotkey],
+    [proposeHotkey],
   )
 
   useEffect(() => {
     if (!recording) return
     loneModifier.current = null
+    heldRight.current = null
     window.addEventListener('keydown', handleKeyDown, true)
     window.addEventListener('keyup', handleKeyUp, true)
     return () => {

@@ -810,6 +810,9 @@ fn normalize_hotkey_modifier(value: &str) -> Option<(&'static str, &'static str)
         "rightalt" | "right_alt" | "right-alt" | "altright" | "alt_right" | "alt-right" => {
             Some(("rightalt", "RightAlt"))
         }
+        "rightcommand" => Some(("rightcommand", "RightCommand")),
+        "rightctrl" => Some(("rightctrl", "RightCtrl")),
+        "rightshift" => Some(("rightshift", "RightShift")),
         "ctrl" | "control" => Some(("ctrl", "Ctrl")),
         "shift" => Some(("shift", "Shift")),
         "alt" => Some(("alt", "Alt")),
@@ -822,7 +825,7 @@ fn normalize_hotkey_modifier(value: &str) -> Option<(&'static str, &'static str)
 
 fn hotkey_modifier_rank(value: &str) -> u8 {
     match value {
-        "Fn" | "RightAlt" => 0,
+        "Fn" | "RightAlt" | "RightCommand" | "RightCtrl" | "RightShift" => 0,
         "Command" | "Super" => 0,
         "Ctrl" => 1,
         "Option" | "Alt" => 2,

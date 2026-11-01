@@ -377,7 +377,19 @@ function defaultTranslateHotkey(): string | null {
   return 'Ctrl+Shift+/'
 }
 
-const modifierOrder = ['Fn', 'RightAlt', 'Command', 'Super', 'Ctrl', 'Option', 'Alt', 'Shift']
+const modifierOrder = [
+  'Fn',
+  'RightAlt',
+  'RightCommand',
+  'RightCtrl',
+  'RightShift',
+  'Command',
+  'Super',
+  'Ctrl',
+  'Option',
+  'Alt',
+  'Shift',
+]
 
 function normalizeModifier(value: string): string | null {
   switch (value.trim().toLowerCase()) {
@@ -391,6 +403,12 @@ function normalizeModifier(value: string): string | null {
     case 'alt_right':
     case 'alt-right':
       return 'RightAlt'
+    case 'rightcommand':
+      return 'RightCommand'
+    case 'rightctrl':
+      return 'RightCtrl'
+    case 'rightshift':
+      return 'RightShift'
     case 'cmd':
     case 'command':
       return 'Command'
@@ -447,6 +465,17 @@ function normalizePrimary(value: string): string | null {
     '[': '[',
     bracketright: ']',
     ']': ']',
+    quote: "'",
+    "'": "'",
+    backquote: '`',
+    '`': '`',
+    backslash: '\\',
+    '\\': '\\',
+    backspace: 'Backspace',
+    up: 'Up',
+    down: 'Down',
+    left: 'Left',
+    right: 'Right',
   }
   const nativePrimary: Record<string, string> = {
     fn: 'Fn',

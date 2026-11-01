@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, MessageCircle } from 'lucide-react'
 import { isMacPlatform, useAppStore } from '../../stores/appStore'
+import { hotkeyLabel } from '../../lib/engineLabels'
 import type { HotkeyMode, OutputMode, ShortcutBinding } from '../../stores/appStore'
 import {
   getPlatformCapabilities,
@@ -96,12 +97,33 @@ export function GeneralPane() {
     !accessibilityTrusted &&
     hotkeyRegistrationError?.includes('Accessibility permission may be denied'),
   )
-  const dictationSpecialOptions = isMac ? [{ value: 'Fn', label: 'Fn' }] : []
-  const askSpecialOptions = isMac ? [{ value: 'Fn+Space', label: 'Fn + Space' }] : []
-  const translateSpecialOptions = isMac ? [{ value: 'Fn+LeftShift', label: 'Fn + Left Shift' }] : []
   const dictationBindings = config.hotkeys.dictationBindings?.length
     ? config.hotkeys.dictationBindings
     : [config.hotkeys.dictation]
+  // When dictation is a lone right-hand modifier, offer the matching combos
+  // (e.g. Right Cmd + Space) next to the Fn ones.
+  const rightBase = dictationBindings.find(
+    (binding) =>
+      binding?.modifiers.length === 0 && /^Right(Command|Alt|Ctrl|Shift)$/.test(binding.primary),
+  )?.primary
+  const rightCombo = (key: string) =>
+    rightBase
+      ? [
+          {
+            value: `${rightBase}+${key}`,
+            label: hotkeyLabel(`${rightBase}+${key}`).replace(/\+/g, ' + '),
+          },
+        ]
+      : []
+  const dictationSpecialOptions = isMac ? [{ value: 'Fn', label: 'Fn' }] : []
+  const askSpecialOptions = [
+    ...(isMac ? [{ value: 'Fn+Space', label: 'Fn + Space' }] : []),
+    ...rightCombo('Space'),
+  ]
+  const translateSpecialOptions = [
+    ...(isMac ? [{ value: 'Fn+LeftShift', label: 'Fn + Left Shift' }] : []),
+    ...(rightBase === 'RightShift' ? [] : rightCombo('LeftShift')),
+  ]
   const askBindings = config.hotkeys.askBindings ?? (config.hotkeys.ask ? [config.hotkeys.ask] : [])
   const translateBindings =
     config.hotkeys.translateBindings ?? (config.hotkeys.translate ? [config.hotkeys.translate] : [])

@@ -43,6 +43,10 @@ export function llmModelLabel(model: string): string {
 const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
 
 const MODIFIER_LABELS: Record<string, string> = {
+  RightCommand: isMac ? 'Right Cmd' : 'Right Win',
+  RightAlt: isMac ? 'Right Option' : 'Right Alt',
+  RightCtrl: 'Right Ctrl',
+  RightShift: 'Right Shift',
   Command: 'Cmd',
   Cmd: 'Cmd',
   Meta: isMac ? 'Cmd' : 'Win',
@@ -74,9 +78,10 @@ export function bindingKeys(binding: ShortcutBinding | null | undefined): string
   return [...keys, primaryLabel(binding.primary)]
 }
 
-/** Readable hotkey string: "RightCommand" becomes "Right Cmd"; combos stay as typed. */
+/** Readable hotkey string: "RightCommand+/" becomes "Right Cmd+/"; other parts stay as typed. */
 export function hotkeyLabel(hotkey: string): string {
-  const parts = hotkey.split('+')
-  const last = parts.length - 1
-  return parts.map((part, i) => (i === last ? (PRIMARY_LABELS[part] ?? part) : part)).join('+')
+  return hotkey
+    .split('+')
+    .map((part) => PRIMARY_LABELS[part] ?? part)
+    .join('+')
 }

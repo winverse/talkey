@@ -15,25 +15,217 @@ pub enum NativeHotkeyTrigger {
     RightCommand,
     RightCtrl,
     RightShift,
+    /// A right-hand modifier held with one more key, e.g. RightCommand+/.
+    /// RightAlt+Space and RightAlt+LeftShift keep their own variants.
+    RightCombo(RightModifier, NativeComboKey),
 }
 
-impl NativeHotkeyTrigger {
-    pub fn canonical(self) -> &'static str {
+/// Right-hand modifier keys that can act as a native hotkey base.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RightModifier {
+    Command,
+    Alt,
+    Ctrl,
+    Shift,
+}
+
+impl RightModifier {
+    pub fn trigger(self) -> NativeHotkeyTrigger {
         match self {
-            Self::Fn => "Fn",
-            Self::FnSpace => "Fn+Space",
-            Self::FnLeftShift => "Fn+LeftShift",
-            Self::RightAlt => "RightAlt",
-            Self::RightAltSpace => "RightAlt+Space",
-            Self::RightAltLeftShift => "RightAlt+LeftShift",
-            Self::RightCommand => "RightCommand",
-            Self::RightCtrl => "RightCtrl",
-            Self::RightShift => "RightShift",
+            Self::Command => NativeHotkeyTrigger::RightCommand,
+            Self::Alt => NativeHotkeyTrigger::RightAlt,
+            Self::Ctrl => NativeHotkeyTrigger::RightCtrl,
+            Self::Shift => NativeHotkeyTrigger::RightShift,
         }
     }
 
-    /// Bare right-hand modifiers (no combos). Every trigger in this list is
-    /// its own base.
+    pub fn from_trigger(trigger: NativeHotkeyTrigger) -> Option<Self> {
+        match trigger {
+            NativeHotkeyTrigger::RightCommand => Some(Self::Command),
+            NativeHotkeyTrigger::RightAlt => Some(Self::Alt),
+            NativeHotkeyTrigger::RightCtrl => Some(Self::Ctrl),
+            NativeHotkeyTrigger::RightShift => Some(Self::Shift),
+            _ => None,
+        }
+    }
+
+    /// Parses a hotkey part such as "RightCommand".
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_lowercase().as_str() {
+            "rightcommand" => Some(Self::Command),
+            "rightalt" | "right_alt" | "right-alt" | "altright" | "alt_right" | "alt-right" => {
+                Some(Self::Alt)
+            }
+            "rightctrl" => Some(Self::Ctrl),
+            "rightshift" => Some(Self::Shift),
+            _ => None,
+        }
+    }
+}
+
+/// The second key of a native combo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NativeComboKey {
+    Space,
+    LeftShift,
+    Key(NativeKey),
+}
+
+impl NativeComboKey {
+    /// Parses the primary part of a hotkey such as "Space", "LeftShift" or "/".
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_lowercase().as_str() {
+            "space" => Some(Self::Space),
+            "leftshift" | "left_shift" | "left-shift" => Some(Self::LeftShift),
+            _ => NativeKey::from_name(name).map(Self::Key),
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Space => "Space",
+            Self::LeftShift => "LeftShift",
+            Self::Key(key) => key.name(),
+        }
+    }
+}
+
+/// A regular key usable after a right-hand modifier, with its macOS virtual
+/// keycode (ANSI position) and Windows virtual-key code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NativeKey(u8);
+
+struct NativeKeySpec {
+    name: &'static str,
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    mac: i64,
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    win: u32,
+}
+
+const fn key(name: &'static str, mac: i64, win: u32) -> NativeKeySpec {
+    NativeKeySpec { name, mac, win }
+}
+
+const NATIVE_KEYS: [NativeKeySpec; 67] = [
+    key("A", 0, 0x41),
+    key("B", 11, 0x42),
+    key("C", 8, 0x43),
+    key("D", 2, 0x44),
+    key("E", 14, 0x45),
+    key("F", 3, 0x46),
+    key("G", 5, 0x47),
+    key("H", 4, 0x48),
+    key("I", 34, 0x49),
+    key("J", 38, 0x4A),
+    key("K", 40, 0x4B),
+    key("L", 37, 0x4C),
+    key("M", 46, 0x4D),
+    key("N", 45, 0x4E),
+    key("O", 31, 0x4F),
+    key("P", 35, 0x50),
+    key("Q", 12, 0x51),
+    key("R", 15, 0x52),
+    key("S", 1, 0x53),
+    key("T", 17, 0x54),
+    key("U", 32, 0x55),
+    key("V", 9, 0x56),
+    key("W", 13, 0x57),
+    key("X", 7, 0x58),
+    key("Y", 16, 0x59),
+    key("Z", 6, 0x5A),
+    key("0", 29, 0x30),
+    key("1", 18, 0x31),
+    key("2", 19, 0x32),
+    key("3", 20, 0x33),
+    key("4", 21, 0x34),
+    key("5", 23, 0x35),
+    key("6", 22, 0x36),
+    key("7", 26, 0x37),
+    key("8", 28, 0x38),
+    key("9", 25, 0x39),
+    key("/", 44, 0xBF),
+    key(".", 47, 0xBE),
+    key(",", 43, 0xBC),
+    key(";", 41, 0xBA),
+    key("'", 39, 0xDE),
+    key("[", 33, 0xDB),
+    key("]", 30, 0xDD),
+    key("-", 27, 0xBD),
+    key("=", 24, 0xBB),
+    key("`", 50, 0xC0),
+    key("\\", 42, 0xDC),
+    key("Enter", 36, 0x0D),
+    key("Tab", 48, 0x09),
+    key("Escape", 53, 0x1B),
+    key("Backspace", 51, 0x08),
+    key("Up", 126, 0x26),
+    key("Down", 125, 0x28),
+    key("Left", 123, 0x25),
+    key("Right", 124, 0x27),
+    key("F1", 122, 0x70),
+    key("F2", 120, 0x71),
+    key("F3", 99, 0x72),
+    key("F4", 118, 0x73),
+    key("F5", 96, 0x74),
+    key("F6", 97, 0x75),
+    key("F7", 98, 0x76),
+    key("F8", 100, 0x77),
+    key("F9", 101, 0x78),
+    key("F10", 109, 0x79),
+    key("F11", 103, 0x7A),
+    key("F12", 111, 0x7B),
+];
+
+impl NativeKey {
+    pub fn from_name(name: &str) -> Option<Self> {
+        let name = name.trim();
+        NATIVE_KEYS
+            .iter()
+            .position(|spec| spec.name.eq_ignore_ascii_case(name))
+            .map(|index| Self(index as u8))
+    }
+
+    pub fn name(self) -> &'static str {
+        NATIVE_KEYS[self.0 as usize].name
+    }
+
+    #[cfg(target_os = "macos")]
+    fn from_mac_keycode(keycode: i64) -> Option<Self> {
+        NATIVE_KEYS
+            .iter()
+            .position(|spec| spec.mac == keycode)
+            .map(|index| Self(index as u8))
+    }
+
+    #[cfg(target_os = "windows")]
+    fn from_vk(vk: u32) -> Option<Self> {
+        NATIVE_KEYS
+            .iter()
+            .position(|spec| spec.win == vk)
+            .map(|index| Self(index as u8))
+    }
+}
+
+impl NativeHotkeyTrigger {
+    pub fn canonical(self) -> String {
+        match self {
+            Self::Fn => "Fn".to_string(),
+            Self::FnSpace => "Fn+Space".to_string(),
+            Self::FnLeftShift => "Fn+LeftShift".to_string(),
+            Self::RightAlt => "RightAlt".to_string(),
+            Self::RightAltSpace => "RightAlt+Space".to_string(),
+            Self::RightAltLeftShift => "RightAlt+LeftShift".to_string(),
+            Self::RightCommand => "RightCommand".to_string(),
+            Self::RightCtrl => "RightCtrl".to_string(),
+            Self::RightShift => "RightShift".to_string(),
+            Self::RightCombo(modifier, combo) => {
+                format!("{}+{}", modifier.trigger().canonical(), combo.name())
+            }
+        }
+    }
+
+    /// Bare right-hand modifiers. Every trigger in this list is its own base.
     #[cfg(target_os = "windows")]
     const BARE_MODIFIERS: [NativeHotkeyTrigger; 4] = [
         Self::RightAlt,
@@ -50,6 +242,7 @@ impl NativeHotkeyTrigger {
             Self::RightCommand => Self::RightCommand,
             Self::RightCtrl => Self::RightCtrl,
             Self::RightShift => Self::RightShift,
+            Self::RightCombo(modifier, _) => modifier.trigger(),
         }
     }
 
@@ -58,29 +251,25 @@ impl NativeHotkeyTrigger {
         match self {
             Self::FnSpace | Self::RightAltSpace => Some(NativeComboKey::Space),
             Self::FnLeftShift | Self::RightAltLeftShift => Some(NativeComboKey::LeftShift),
+            Self::RightCombo(_, combo) => Some(combo),
             Self::Fn | Self::RightAlt | Self::RightCommand | Self::RightCtrl | Self::RightShift => {
                 None
             }
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows", test))]
-    fn from_base_combo(base: NativeHotkeyTrigger, combo: NativeComboKey) -> Option<Self> {
+    pub fn from_base_combo(base: NativeHotkeyTrigger, combo: NativeComboKey) -> Option<Self> {
         match (base, combo) {
             (Self::Fn, NativeComboKey::Space) => Some(Self::FnSpace),
             (Self::Fn, NativeComboKey::LeftShift) => Some(Self::FnLeftShift),
             (Self::RightAlt, NativeComboKey::Space) => Some(Self::RightAltSpace),
             (Self::RightAlt, NativeComboKey::LeftShift) => Some(Self::RightAltLeftShift),
-            _ => None,
+            (Self::RightShift, NativeComboKey::LeftShift) => None,
+            (base, combo) => {
+                RightModifier::from_trigger(base).map(|modifier| Self::RightCombo(modifier, combo))
+            }
         }
     }
-}
-
-#[cfg(any(target_os = "macos", target_os = "windows", test))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum NativeComboKey {
-    Space,
-    LeftShift,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,10 +495,13 @@ fn dispatch_native_base_edge(
     }
 
     if state.combo_used {
-        for combo in [NativeComboKey::Space, NativeComboKey::LeftShift] {
-            if let Some(trigger) = NativeHotkeyTrigger::from_base_combo(base, combo) {
-                let _ = dispatch_matching_bindings(bindings, trigger, false, handler);
-            }
+        let combo_triggers: Vec<NativeHotkeyTrigger> = bindings
+            .iter()
+            .map(|binding| binding.binding.trigger)
+            .filter(|trigger| trigger.base() == base && trigger.combo_key().is_some())
+            .collect();
+        for trigger in combo_triggers {
+            let _ = dispatch_matching_bindings(bindings, trigger, false, handler);
         }
         state.base_pressed = false;
         state.pending_base_press = false;
@@ -379,7 +571,7 @@ mod platform {
     use super::{
         activate_pending_hold_base, bound_bases, cancel_native_base_on_other_key,
         dispatch_native_base_edge, dispatch_native_combo_edge, monitored_bindings_for_bases,
-        NativeComboKey, NativeComboState, NativeHotkeyHandler, NativeHotkeyTrigger,
+        NativeComboKey, NativeComboState, NativeHotkeyHandler, NativeHotkeyTrigger, NativeKey,
         NativeMonitoredBinding,
     };
     use std::ffi::c_void;
@@ -750,12 +942,41 @@ mod platform {
                 }
             }
             FLAGS_CHANGED => handle_flags_changed(context, event),
-            KEY_DOWN => handle_key_event(context, event, true),
-            KEY_UP => handle_key_event(context, event, false),
+            // A right-hand modifier combo matched: keep the key away from
+            // the focused app (Right Command + / is not Cmd+/).
+            KEY_DOWN | KEY_UP if handle_key_event(context, event, event_type == KEY_DOWN) => {
+                return std::ptr::null_mut();
+            }
             _ => {}
         }
 
         event
+    }
+
+    /// Feeds a combo key edge to every bound base. Returns true when a combo
+    /// on a right-hand modifier matched, so the key event should be dropped.
+    fn dispatch_combo_to_bases(
+        context: &CallbackContext,
+        combo: NativeComboKey,
+        pressed: bool,
+    ) -> (bool, bool) {
+        let mut matched = false;
+        let mut swallow = false;
+        for (base, state) in &context.states {
+            let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+            if dispatch_native_combo_edge(
+                &mut state,
+                &context.bindings,
+                *base,
+                combo,
+                pressed,
+                &context.handler,
+            ) {
+                matched = true;
+                swallow |= state.defer_bare;
+            }
+        }
+        (matched, swallow)
     }
 
     fn handle_flags_changed(context: &CallbackContext, event: CgEventRef) {
@@ -794,16 +1015,9 @@ mod platform {
 
         if keycode == LEFT_SHIFT_KEYCODE {
             let pressed = (flags & FLAG_MASK_SHIFT) != 0;
-            if let Some(state) = context.state_for(NativeHotkeyTrigger::Fn) {
-                let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
-                let _ = dispatch_native_combo_edge(
-                    &mut state,
-                    &context.bindings,
-                    NativeHotkeyTrigger::Fn,
-                    NativeComboKey::LeftShift,
-                    pressed,
-                    &context.handler,
-                );
+            let (matched, _) = dispatch_combo_to_bases(context, NativeComboKey::LeftShift, pressed);
+            if matched {
+                return;
             }
         }
 
@@ -854,24 +1068,23 @@ mod platform {
         }
     }
 
-    fn handle_key_event(context: &CallbackContext, event: CgEventRef, pressed: bool) {
+    /// Returns true when the key event belongs to a right-hand modifier combo
+    /// and must not reach the focused app.
+    fn handle_key_event(context: &CallbackContext, event: CgEventRef, pressed: bool) -> bool {
         let keycode = unsafe { CGEventGetIntegerValueField(event, KEYBOARD_EVENT_KEYCODE) };
-        if keycode == SPACE_KEYCODE {
-            if let Some(state) = context.state_for(NativeHotkeyTrigger::Fn) {
-                let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
-                let _ = dispatch_native_combo_edge(
-                    &mut state,
-                    &context.bindings,
-                    NativeHotkeyTrigger::Fn,
-                    NativeComboKey::Space,
-                    pressed,
-                    &context.handler,
-                );
-            }
-        }
-        if pressed {
+        let combo = if keycode == SPACE_KEYCODE {
+            Some(NativeComboKey::Space)
+        } else {
+            NativeKey::from_mac_keycode(keycode).map(NativeComboKey::Key)
+        };
+        let (matched, swallow) = match combo {
+            Some(combo) => dispatch_combo_to_bases(context, combo, pressed),
+            None => (false, false),
+        };
+        if pressed && !matched {
             context.cancel_deferred_bases(None);
         }
+        swallow
     }
 }
 
@@ -880,7 +1093,7 @@ mod platform {
     use super::{
         bound_bases, dispatch_native_base_edge, dispatch_native_combo_edge,
         monitored_bindings_for_bases, NativeComboKey, NativeComboState, NativeHotkeyHandler,
-        NativeHotkeyTrigger, NativeMonitoredBinding,
+        NativeHotkeyTrigger, NativeKey, NativeMonitoredBinding,
     };
     use std::ptr;
     use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, Ordering as AtomicOrdering};
@@ -1209,20 +1422,24 @@ mod platform {
         let combo = match vk_code {
             VK_SPACE => NativeComboKey::Space,
             VK_LSHIFT => NativeComboKey::LeftShift,
-            _ => return false,
+            other => match NativeKey::from_vk(other) {
+                Some(key) => NativeComboKey::Key(key),
+                None => return false,
+            },
         };
-        let Some(state) = context.state_for(NativeHotkeyTrigger::RightAlt) else {
-            return false;
-        };
-        let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
-        dispatch_native_combo_edge(
-            &mut state,
-            &context.bindings,
-            NativeHotkeyTrigger::RightAlt,
-            combo,
-            pressed,
-            &context.handler,
-        )
+        let mut matched = false;
+        for (base, state) in &context.states {
+            let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
+            matched |= dispatch_native_combo_edge(
+                &mut state,
+                &context.bindings,
+                *base,
+                combo,
+                pressed,
+                &context.handler,
+            );
+        }
+        matched
     }
 
     unsafe fn callback_context<'a>() -> Option<&'a CallbackContext> {
@@ -1374,6 +1591,81 @@ mod tests {
                     ShortcutState::Released
                 ),
             ]
+        );
+    }
+
+    #[test]
+    fn right_command_combo_fires_without_the_bare_binding() {
+        let slash = NativeHotkeyTrigger::RightCombo(
+            RightModifier::Command,
+            NativeComboKey::Key(NativeKey::from_name("/").unwrap()),
+        );
+        let bindings = monitored_bindings_for_bases(
+            vec![
+                NativeHotkeyBinding {
+                    role: crate::hotkey::HotkeyRole::Dictation,
+                    index: 0,
+                    trigger: NativeHotkeyTrigger::RightCommand,
+                },
+                NativeHotkeyBinding {
+                    role: crate::hotkey::HotkeyRole::Ask,
+                    index: 0,
+                    trigger: slash,
+                },
+            ],
+            &[NativeHotkeyTrigger::RightCommand],
+        );
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&events);
+        let handler: NativeHotkeyHandler = Arc::new(move |event| {
+            captured.lock().unwrap().push((event.role, event.state));
+        });
+        let base = NativeHotkeyTrigger::RightCommand;
+        let combo = NativeComboKey::Key(NativeKey::from_name("/").unwrap());
+        let other = NativeComboKey::Key(NativeKey::from_name("c").unwrap());
+        let mut state = NativeComboState {
+            defer_bare: true,
+            ..NativeComboState::default()
+        };
+
+        dispatch_native_base_edge(&mut state, &bindings, base, true, &handler);
+        assert!(!dispatch_native_combo_edge(
+            &mut state, &bindings, base, other, true, &handler
+        ));
+        assert!(dispatch_native_combo_edge(
+            &mut state, &bindings, base, combo, true, &handler
+        ));
+        assert!(dispatch_native_combo_edge(
+            &mut state, &bindings, base, combo, false, &handler
+        ));
+        dispatch_native_base_edge(&mut state, &bindings, base, false, &handler);
+
+        assert_eq!(
+            *events.lock().unwrap(),
+            vec![
+                (crate::hotkey::HotkeyRole::Ask, ShortcutState::Pressed),
+                (crate::hotkey::HotkeyRole::Ask, ShortcutState::Released),
+            ]
+        );
+    }
+
+    #[test]
+    fn native_key_names_round_trip() {
+        for name in ["A", "z", "0", "/", ",", "\\", "Enter", "F12", "Up"] {
+            let key = NativeKey::from_name(name).unwrap();
+            assert!(key.name().eq_ignore_ascii_case(name));
+        }
+        assert_eq!(NativeKey::from_name("Space"), None);
+        assert_eq!(
+            NativeComboKey::from_name("space"),
+            Some(NativeComboKey::Space)
+        );
+        assert_eq!(
+            NativeHotkeyTrigger::from_base_combo(
+                NativeHotkeyTrigger::RightShift,
+                NativeComboKey::LeftShift
+            ),
+            None
         );
     }
 

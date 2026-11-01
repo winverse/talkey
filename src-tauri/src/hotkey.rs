@@ -376,7 +376,7 @@ fn push_registered_hotkey(
             return Err(HotkeyPairError::UnsupportedNativeHotkey {
                 role,
                 index,
-                value: trigger.canonical().to_string(),
+                value: trigger.canonical(),
                 platform: platform.to_string(),
             });
         }
@@ -406,24 +406,13 @@ fn push_registered_hotkey(
 
 pub fn native_trigger_supported_on_platform(trigger: NativeHotkeyTrigger, platform: &str) -> bool {
     match platform {
-        "macos" => matches!(
+        // Fn and every right-hand modifier, alone or with one key.
+        "macos" => true,
+        "windows" => !matches!(
             trigger,
             NativeHotkeyTrigger::Fn
                 | NativeHotkeyTrigger::FnSpace
                 | NativeHotkeyTrigger::FnLeftShift
-                | NativeHotkeyTrigger::RightAlt
-                | NativeHotkeyTrigger::RightCommand
-                | NativeHotkeyTrigger::RightCtrl
-                | NativeHotkeyTrigger::RightShift
-        ),
-        "windows" => matches!(
-            trigger,
-            NativeHotkeyTrigger::RightAlt
-                | NativeHotkeyTrigger::RightAltSpace
-                | NativeHotkeyTrigger::RightAltLeftShift
-                | NativeHotkeyTrigger::RightCommand
-                | NativeHotkeyTrigger::RightCtrl
-                | NativeHotkeyTrigger::RightShift
         ),
         _ => false,
     }
@@ -443,6 +432,15 @@ pub fn native_trigger_from_binding(
             "rightshift" => Some(NativeHotkeyTrigger::RightShift),
             _ => None,
         };
+    }
+
+    if binding.modifiers.len() == 1 {
+        if let Some(modifier) =
+            crate::native_hotkey::RightModifier::from_name(&binding.modifiers[0])
+        {
+            return crate::native_hotkey::NativeComboKey::from_name(&binding.primary)
+                .and_then(|combo| NativeHotkeyTrigger::from_base_combo(modifier.trigger(), combo));
+        }
     }
 
     if binding.modifiers.len() != 1 {
@@ -1289,6 +1287,67 @@ mod tests {
     }
 
     #[test]
+    fn right_command_combos_use_native_adapter_plan() {
+        use crate::native_hotkey::{NativeComboKey, NativeKey, RightModifier};
+
+        let dictation = storage::ShortcutBinding::from_hotkey("RightCommand").unwrap();
+        let ask = storage::ShortcutBinding::from_hotkey("RightCommand+/");
+        let translate = storage::ShortcutBinding::from_hotkey("RightCommand+,");
+        assert_eq!(
+            ask.as_ref().and_then(|binding| binding.to_hotkey_string()),
+            Some("RightCommand+/".to_string())
+        );
+        let config = storage::HotkeyConfig {
+            dictation_bindings: vec![dictation.clone()],
+            ask_bindings: ask.clone().into_iter().collect(),
+            translate_bindings: translate.clone().into_iter().collect(),
+            dictation,
+            ask,
+            translate,
+            edit_selection: None,
+            switch_scene: None,
+            open_app: None,
+            dictation_mode: "toggle".to_string(),
+        };
+
+        for platform in ["macos", "windows"] {
+            let plan =
+                hotkey_registration_plan_from_config_for_platform(&config, platform).unwrap();
+            assert!(plan.global.is_empty());
+            let ask_trigger = plan
+                .native
+                .iter()
+                .find(|entry| entry.role == HotkeyRole::Ask)
+                .map(|entry| entry.trigger);
+            assert_eq!(
+                ask_trigger,
+                Some(NativeHotkeyTrigger::RightCombo(
+                    RightModifier::Command,
+                    NativeComboKey::Key(NativeKey::from_name("/").unwrap())
+                ))
+            );
+            assert_eq!(ask_trigger.unwrap().canonical(), "RightCommand+/");
+        }
+    }
+
+    #[test]
+    fn right_alt_space_keeps_its_legacy_trigger() {
+        let binding = storage::ShortcutBinding::from_hotkey("RightAlt+Space").unwrap();
+        assert_eq!(
+            native_trigger_from_binding(&binding),
+            Some(NativeHotkeyTrigger::RightAltSpace)
+        );
+        let binding = storage::ShortcutBinding::from_hotkey("RightCommand+Space").unwrap();
+        assert_eq!(
+            native_trigger_from_binding(&binding).map(NativeHotkeyTrigger::canonical),
+            Some("RightCommand+Space".to_string())
+        );
+        // Plain Command combos stay global shortcuts.
+        let binding = storage::ShortcutBinding::from_hotkey("Command+/").unwrap();
+        assert_eq!(native_trigger_from_binding(&binding), None);
+    }
+
+    #[test]
     fn fn_dictation_conflicts_with_fn_ask_binding() {
         let dictation = storage::ShortcutBinding {
             primary: "Fn".to_string(),
@@ -1483,7 +1542,7 @@ mod tests {
             NativeHotkeyTrigger::RightCommand,
             "macos"
         ));
-        assert!(!native_trigger_supported_on_platform(
+        assert!(native_trigger_supported_on_platform(
             NativeHotkeyTrigger::RightAltSpace,
             "macos"
         ));
