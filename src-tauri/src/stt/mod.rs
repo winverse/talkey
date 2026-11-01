@@ -26,6 +26,8 @@ pub struct SttConfig {
     pub operation_id: Option<String>,
     pub managed_audio: Option<managed_audio::ManagedAudioEncodingConfig>,
     pub provider_region: Option<String>,
+    /// Vocabulary hint for Whisper-compatible providers (sent as the `prompt` form field).
+    pub prompt_hint: Option<String>,
 }
 
 impl Default for SttConfig {
@@ -39,6 +41,7 @@ impl Default for SttConfig {
             operation_id: None,
             managed_audio: None,
             provider_region: None,
+            prompt_hint: None,
         }
     }
 }
@@ -66,6 +69,37 @@ pub trait SttProvider: Send + Sync {
         None
     }
     fn name(&self) -> &str;
+}
+
+/// Max characters of dictionary words sent as a Whisper `prompt` hint.
+/// Measured with whisper.cpp 1.8.4 + large-v3-turbo (2026-11-01): a 400-char hint still
+/// steered spelling (React, useState), a 595-char hint had no effect.
+const PROMPT_HINT_MAX_CHARS: usize = 400;
+
+/// Build a Whisper vocabulary hint from the user's dictionary words.
+/// Returns `None` when the dictionary is empty.
+pub fn build_prompt_hint(words: &[String]) -> Option<String> {
+    let mut hint = String::new();
+    for word in words {
+        let word = word.replace(['\n', '\r', '\0'], " ");
+        let word = word.trim();
+        if word.is_empty() {
+            continue;
+        }
+        let extra = if hint.is_empty() {
+            word.chars().count()
+        } else {
+            word.chars().count() + 2
+        };
+        if hint.chars().count() + extra > PROMPT_HINT_MAX_CHARS {
+            break;
+        }
+        if !hint.is_empty() {
+            hint.push_str(", ");
+        }
+        hint.push_str(word);
+    }
+    (!hint.is_empty()).then_some(hint)
 }
 
 pub fn create_provider(
@@ -114,6 +148,30 @@ pub fn create_provider(
                 None => Box::new(WhisperCompatProvider::new(wc)),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod prompt_hint_tests {
+    use super::build_prompt_hint;
+
+    #[test]
+    fn empty_dictionary_has_no_hint() {
+        assert_eq!(build_prompt_hint(&[]), None);
+        assert_eq!(build_prompt_hint(&["  ".to_string()]), None);
+    }
+
+    #[test]
+    fn joins_words_and_respects_limit() {
+        let words = vec!["React".to_string(), "useState".to_string()];
+        assert_eq!(
+            build_prompt_hint(&words).as_deref(),
+            Some("React, useState")
+        );
+        let many: Vec<String> = (0..500).map(|i| format!("word{i}")).collect();
+        let hint = build_prompt_hint(&many).unwrap();
+        assert!(hint.chars().count() <= 400);
+        assert!(hint.starts_with("word0, word1"));
     }
 }
 

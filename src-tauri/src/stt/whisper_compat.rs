@@ -76,6 +76,13 @@ impl WhisperCompatProvider {
     }
 }
 
+fn accepts_prompt_hint(provider_name: &str) -> bool {
+    matches!(
+        provider_name,
+        super::config::CUSTOM_WHISPER_PROVIDER | "openai-whisper" | "groq-whisper"
+    )
+}
+
 #[async_trait]
 impl SttProvider for WhisperCompatProvider {
     async fn connect(&mut self, config: &SttConfig) -> Result<(), AppError> {
@@ -149,6 +156,16 @@ impl SttProvider for WhisperCompatProvider {
             if let Some(ref lang) = config.language {
                 if lang != "multi" {
                     form = form.text("language", lang.clone());
+                }
+            }
+
+            // Vocabulary hint from the user's dictionary (OpenAI-compatible `prompt`).
+            // Only for providers known to accept it; GLM-ASR and others get no extra field.
+            if let Some(ref hint) = config.prompt_hint {
+                if accepts_prompt_hint(&self.provider_config.provider_name)
+                    && !hint.trim().is_empty()
+                {
+                    form = form.text("prompt", hint.clone());
                 }
             }
 
@@ -274,6 +291,7 @@ mod tests {
                 operation_id: None,
                 managed_audio: None,
                 provider_region: None,
+                prompt_hint: None,
             })
             .await;
 

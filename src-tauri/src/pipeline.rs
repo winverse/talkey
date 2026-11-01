@@ -1171,6 +1171,7 @@ impl PipelineHandle {
         );
         let dictionary_store = self.app_handle.state::<storage::DictionaryStore>();
         let dict_words = dictionary_store.words().await;
+        let stt_prompt_hint = stt::build_prompt_hint(&dict_words);
         let correction_rules = dictionary_store
             .enabled_correction_rules()
             .await
@@ -1327,6 +1328,7 @@ impl PipelineHandle {
             provider_region: (config_data.stt_provider
                 == stt::aliyun_qwen3_asr::ALIYUN_QWEN3_ASR_PROVIDER)
                 .then(|| config_data.stt_aliyun_qwen_region.clone()),
+            prompt_hint: stt_prompt_hint,
         };
         let managed_cloud_session_token =
             (config_data.stt_provider == "cloud").then(|| stt_config.api_key.clone());

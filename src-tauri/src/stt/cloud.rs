@@ -546,6 +546,7 @@ mod tests {
             operation_id: Some("operation-1".to_string()),
             managed_audio: Some(managed_config()),
             provider_region: None,
+            prompt_hint: None,
         }
     }
 
