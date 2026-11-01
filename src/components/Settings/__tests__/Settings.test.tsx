@@ -251,6 +251,7 @@ vi.mock('../../../stores/authStore', () => ({
 
 // ─── Import components AFTER mocks ───────────────────────────────────────────
 import { Settings } from '../index'
+import { AUTO_SAVE_DELAY_MS } from '../shared/useAutoSaveConfig'
 import {
   checkAccessibilityPermission,
   getConfig,
@@ -388,16 +389,15 @@ describe('Settings tab 切换', () => {
     expect(screen.getByText('settings.hideCapsuleWhenIdle')).toBeDefined()
   })
 
-  it('keeps unsaved drafts dirty after leaving and reopening Settings', () => {
+  it('saves a pending change right away when Settings is left', async () => {
+    vi.mocked(updateConfig).mockResolvedValue(undefined)
     const firstRender = renderSettings()
-    act(() => useAppStore.getState().updateConfig({ auto_start: false }))
-    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+    act(() => useAppStore.getState().updateConfig({ theme: 'dark' }))
+    expect(screen.queryByText('Unsaved changes')).toBeNull()
 
     firstRender.unmount()
-    renderSettings()
 
-    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
-    expect(useAppStore.getState().savedConfig?.auto_start).toBe(true)
+    await waitFor(() => expect(useAppStore.getState().savedConfig?.theme).toBe('dark'))
   })
 
   it('does not mark an unchanged backend config dirty when object key order differs', () => {
@@ -754,7 +754,7 @@ describe('Settings tab 切换', () => {
     expect(titles.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('records macOS Ask hotkey as a local draft without immediate persistence', async () => {
+  it('records macOS Ask hotkey and saves it through the config save', async () => {
     vi.useFakeTimers()
     try {
       Object.defineProperty(window.navigator, 'platform', {
@@ -783,7 +783,12 @@ describe('Settings tab 切换', () => {
       expect(useAppStore.getState().config.ask_hotkey).toBe('Command+;')
       expect(mockUpdateAskHotkey).not.toHaveBeenCalled()
       expect(mockResumeHotkey).toHaveBeenCalledTimes(1)
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
+      // The draft is saved through the regular config save, not a direct update.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(AUTO_SAVE_DELAY_MS + 50)
+      })
+      expect(screen.queryByText('Unsaved changes')).toBeNull()
+      expect(vi.mocked(updateConfig).mock.lastCall?.[0].ask_hotkey).toBe('Command+;')
     } finally {
       vi.useRealTimers()
     }
@@ -930,7 +935,6 @@ describe('Settings Scenes local custom scenes', () => {
   it('persists only scene fields and preserves unrelated unsaved settings', async () => {
     renderSettings()
     act(() => useAppStore.getState().updateConfig({ auto_start: false }))
-    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
     clickSidebarItem('settings.scenes')
 
     fireEvent.click(screen.getByText('scenes.newScene'))
@@ -947,7 +951,6 @@ describe('Settings Scenes local custom scenes', () => {
     expect(persistedConfig.auto_start).toBe(true)
     expect(useAppStore.getState().config.auto_start).toBe(false)
     expect(useAppStore.getState().savedConfig?.auto_start).toBe(true)
-    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
   })
 
   it('lets existing users clear a legacy globally active scene', async () => {
@@ -1282,9 +1285,15 @@ describe('LlmPane models 缓存：已有缓存时跳过 fetch', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. DirtyBar — 配置变更后出现，Reset 后消失
+// 6. Auto-save — settings save on their own, without a save bar
 // ─────────────────────────────────────────────────────────────────────────────
-describe('DirtyBar 行为', () => {
+/** Waits past the auto-save delay and lets the save settle. */
+async function waitForAutoSave() {
+  await act(() => new Promise((resolve) => setTimeout(resolve, AUTO_SAVE_DELAY_MS + 50)))
+  await act(async () => {})
+}
+
+describe('Settings auto-save', () => {
   beforeEach(() => {
     resetStore()
     seedSavedConfig()
@@ -1299,46 +1308,36 @@ describe('DirtyBar 行为', () => {
     vi.mocked(toast).mockClear()
   })
 
-  it('初始状态下 DirtyBar 不显示', () => {
+  it('does not save when nothing changed', async () => {
     renderSettings()
+    await waitForAutoSave()
+    expect(vi.mocked(updateConfig)).not.toHaveBeenCalled()
+  })
+
+  it('saves a change automatically, with no save bar', async () => {
+    renderSettings()
+    act(() => {
+      useAppStore.getState().updateConfig({ theme: 'dark' })
+    })
     expect(screen.queryByText('Unsaved changes')).toBeNull()
+    expect(screen.queryByText('Save')).toBeNull()
+
+    await waitForAutoSave()
+
+    expect(vi.mocked(updateConfig)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(updateConfig).mock.calls[0][0].theme).toBe('dark')
+    expect(useAppStore.getState().savedConfig?.theme).toBe('dark')
   })
 
-  it('修改 config 后 DirtyBar 出现', async () => {
+  it('saves quick successive changes once', async () => {
     renderSettings()
-    act(() => {
-      useAppStore.getState().updateConfig({ theme: 'dark' })
-    })
-    await waitFor(() => {
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
-    })
-  })
+    act(() => useAppStore.getState().updateConfig({ theme: 'dark' }))
+    act(() => useAppStore.getState().updateConfig({ theme: 'light' }))
 
-  it('点击 Reset 后 DirtyBar 消失', async () => {
-    renderSettings()
-    act(() => {
-      useAppStore.getState().updateConfig({ theme: 'dark' })
-    })
-    await waitFor(() => {
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
-    })
+    await waitForAutoSave()
 
-    fireEvent.click(screen.getByText('Reset'))
-
-    await waitFor(() => {
-      expect(screen.queryByText('Unsaved changes')).toBeNull()
-    })
-  })
-
-  it('DirtyBar 显示 Save 和 Reset 两个按钮', async () => {
-    renderSettings()
-    act(() => {
-      useAppStore.getState().updateConfig({ theme: 'dark' })
-    })
-    await waitFor(() => {
-      expect(screen.getByText('Save')).toBeDefined()
-      expect(screen.getByText('Reset')).toBeDefined()
-    })
+    expect(vi.mocked(updateConfig)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(updateConfig).mock.calls[0][0].theme).toBe('light')
   })
 
   it('persisted capsule visibility patch does not erase unrelated dirty settings', async () => {
@@ -1365,11 +1364,7 @@ describe('DirtyBar 行为', () => {
     act(() => {
       useAppStore.getState().updateConfig({ theme: 'dark' })
     })
-    await waitFor(() => {
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitForAutoSave()
 
     await waitFor(() => {
       expect(vi.mocked(getConfig)).toHaveBeenCalledTimes(1)
@@ -1393,15 +1388,15 @@ describe('DirtyBar 行为', () => {
     act(() => {
       useAppStore.getState().updateConfig({ hotkey: 'Ctrl+Shift+;' })
     })
-    await waitFor(() => {
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
-    })
+    await waitForAutoSave()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
+    // After a failed save the backend error is read again. (GeneralPane then
+    // re-reads hotkey status, whose mock reports no error.)
     await waitFor(() => {
-      expect(useAppStore.getState().hotkeyRegistrationError).toBe('Shortcut registration failed')
+      expect(vi.mocked(getHotkeyRegistrationError)).toHaveBeenCalledTimes(1)
     })
+    expect(vi.mocked(getConfig)).toHaveBeenCalledTimes(1)
+    expect(toast).toHaveBeenCalledWith('Shortcut registration failed', 'error')
   })
 
   it('开机启动系统设置失败时不保存 config，并恢复后端真值', async () => {
@@ -1416,11 +1411,7 @@ describe('DirtyBar 行为', () => {
     act(() => {
       useAppStore.getState().updateConfig({ auto_start: false })
     })
-    await waitFor(() => {
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitForAutoSave()
 
     await waitFor(() => {
       expect(vi.mocked(setAutoStart)).toHaveBeenCalledWith(false)
@@ -1443,11 +1434,7 @@ describe('DirtyBar 行为', () => {
     act(() => {
       useAppStore.getState().updateConfig({ auto_start: false })
     })
-    await waitFor(() => {
-      expect(screen.getByText('Unsaved changes')).toBeDefined()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitForAutoSave()
 
     await waitFor(() => {
       expect(vi.mocked(setAutoStart)).toHaveBeenCalledWith(false)

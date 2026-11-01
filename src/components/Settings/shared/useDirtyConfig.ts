@@ -29,6 +29,12 @@ function valuesEqual(left: unknown, right: unknown): boolean {
   )
 }
 
+/** Whether the settings draft differs from the last saved config, outside React. */
+export function isConfigDirty(): boolean {
+  const { config, savedConfig } = useAppStore.getState()
+  return savedConfig !== null && !valuesEqual(config, savedConfig)
+}
+
 export function useDirtyConfig() {
   const config = useAppStore((state) => state.config)
   const savedConfig = useAppStore((state) => state.savedConfig)

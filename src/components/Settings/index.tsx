@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/appStore'
@@ -10,8 +10,7 @@ import { LlmPane } from './LlmPane'
 import { DictionaryPane } from './DictionaryPane'
 import { ScenesPane } from './ScenesPane'
 import { AboutPane } from './AboutPane'
-import { DirtyBar } from './shared/DirtyBar'
-import { useDirtyConfig } from './shared/useDirtyConfig'
+import { useAutoSaveConfig } from './shared/useAutoSaveConfig'
 
 const paneTitleKeys: Record<PaneId, string> = {
   general: 'settings.general',
@@ -36,12 +35,10 @@ interface Props {
 
 export function Settings({ onClose }: Props) {
   const [activePane, setActivePane] = useState<PaneId>(() => paneFromHash() ?? 'general')
-  const [confirmingClose, setConfirmingClose] = useState(false)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const config = useAppStore((s) => s.config)
   const setSavedConfig = useAppStore((s) => s.setSavedConfig)
-  const resetConfig = useAppStore((s) => s.resetConfig)
-  const isDirty = useDirtyConfig()
+  const flushSave = useAutoSaveConfig()
   const { t } = useTranslation()
 
   // First-run onboarding may enter Settings before MainApp has established backend truth.
@@ -62,17 +59,10 @@ export function Settings({ onClose }: Props) {
     contentRef.current?.scrollTo?.({ top: 0 })
   }, [activePane])
 
-  useEffect(() => {
-    if (!isDirty) setConfirmingClose(false)
-  }, [isDirty])
-
+  // Changes save automatically; closing saves anything still pending first.
   const requestClose = () => {
     if (!onClose) return
-    if (isDirty) {
-      setConfirmingClose(true)
-      return
-    }
-    onClose()
+    void flushSave().finally(onClose)
   }
 
   useEffect(() => {
@@ -129,33 +119,6 @@ export function Settings({ onClose }: Props) {
           </div>
         </div>
       </div>
-
-      {confirmingClose && (
-        <div className="flex items-center justify-between gap-3 border-t border-border bg-warning/10 px-5 py-2.5">
-          <span className="text-[12.5px] text-text-secondary">{t('settings.unsavedClose')}</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmingClose(false)}
-              className="rounded-[8px] border border-border bg-bg-primary px-3 py-1.5 text-[12px] text-text-secondary cursor-pointer hover:text-text-primary"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                resetConfig()
-                onClose?.()
-              }}
-              className="rounded-[8px] border-none bg-text-primary px-3 py-1.5 text-[12px] font-medium text-bg-primary cursor-pointer hover:opacity-90"
-            >
-              {t('settings.discardAndClose')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <AnimatePresence>{isDirty && !confirmingClose && <DirtyBar />}</AnimatePresence>
     </div>
   )
 
