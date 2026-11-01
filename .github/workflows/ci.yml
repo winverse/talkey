@@ -108,4 +108,4 @@ jobs:
       # wayland-scanner publishes a quick-xml >=0.41 compatible release.
       # zip 4.x comes from tauri-plugin-updater. Talkey ships with the updater
       # disabled (no endpoints), so no update archive is ever extracted.
-      - run: cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0368
+      - run: cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
