@@ -505,6 +505,8 @@
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
     "dictationMode": "받아쓰기 모드",
+    "uiScale": "화면 크기",
+    "uiScaleHint": "글자와 화면을 함께 키우고, 창도 같은 비율로 바꿉니다. 화면보다 크면 화면에 맞춥니다.",
     "close": "닫기",
     "unsavedClose": "저장하지 않은 변경이 있어요.",
     "discardAndClose": "저장 안 하고 닫기"

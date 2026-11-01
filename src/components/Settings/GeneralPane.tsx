@@ -252,6 +252,20 @@ export function GeneralPane() {
           )}
       </Section>
 
+      <Section title={t('settings.uiScale')}>
+        <SegmentedControl
+          options={UI_SCALE_PRESETS.map((scale) => ({
+            value: String(scale),
+            label: `${Math.round(scale * 100)}%`,
+          }))}
+          value={String(config.ui_scale ?? 1)}
+          onChange={(v) => updateConfig({ ui_scale: Number(v) })}
+        />
+        <p className="mt-2 text-[12px] leading-relaxed text-text-tertiary">
+          {t('settings.uiScaleHint')}
+        </p>
+      </Section>
+
       <div>
         <button
           type="button"
@@ -289,6 +303,9 @@ export function GeneralPane() {
     </div>
   )
 }
+
+/** Window size presets, like a game client's window size option. */
+const UI_SCALE_PRESETS = [0.9, 1, 1.1, 1.25, 1.4]
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

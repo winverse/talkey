@@ -308,6 +308,9 @@ pub async fn update_config(
 
     update_runtime_caches(&cache, &ask_cache, &role_cache, &close_tray_cache, &config);
     crate::audio::capture::set_preferred_input_device(&config.input_device);
+    if previous.ui_scale != config.ui_scale {
+        crate::ui_scale::apply(&app, config.ui_scale, true);
+    }
     emit_config_patch(&app, &patch);
     if patch.get("ui_language").is_some()
         || patch.get("capsule_auto_hide").is_some()

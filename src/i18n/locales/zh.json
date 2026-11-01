@@ -505,6 +505,8 @@
     "mappingResetConfirmAction": "重置映射",
     "mappingNoMappings": "暂无自定义应用映射",
     "dictationMode": "听写触发方式",
+    "uiScale": "窗口大小",
+    "uiScaleHint": "同时放大文字和界面，窗口也按相同比例调整。超出屏幕时会适配屏幕。",
     "close": "Close",
     "unsavedClose": "You have unsaved changes.",
     "discardAndClose": "Discard and close"

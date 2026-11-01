@@ -20,6 +20,7 @@ pub mod selection;
 pub mod storage;
 pub mod stt;
 pub mod tray;
+pub mod ui_scale;
 pub mod voice_intent;
 
 pub use hotkey::{default_ask_shortcut, default_shortcut, parse_hotkey};
@@ -1194,6 +1195,9 @@ pub fn run() {
                     }
                 }
             }
+
+            // Window size preset: zoom only, the restored window size is kept.
+            ui_scale::apply(app.handle(), initial_config.ui_scale, false);
 
             // Start minimized: only show window if not configured to start minimized
             if !initial_config.start_minimized {

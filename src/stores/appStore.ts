@@ -241,6 +241,8 @@ export interface AppConfig {
   capsule_auto_hide: boolean
   /** Microphone picked in the tray menu. Empty records from the system default. */
   input_device?: string
+  /** Main window size preset: page zoom and window size ratio (1 = 100%). */
+  ui_scale?: number
 }
 
 export type TestStatus = 'idle' | 'testing' | 'success' | 'error'

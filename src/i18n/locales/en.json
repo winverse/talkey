@@ -505,6 +505,8 @@
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
     "dictationMode": "Dictation mode",
+    "uiScale": "Window size",
+    "uiScaleHint": "Scales text and layout, and resizes the window by the same ratio. Fits the screen if it would be larger.",
     "close": "Close",
     "unsavedClose": "You have unsaved changes.",
     "discardAndClose": "Discard and close"

@@ -381,6 +381,8 @@ pub struct AppConfig {
     pub capsule_auto_hide: bool,
     /// Microphone picked in the tray menu. Empty records from the system default.
     pub input_device: String,
+    /// Main window size preset: page zoom and window size ratio (1.0 = 100%).
+    pub ui_scale: f64,
 }
 
 impl Default for AppConfig {
@@ -439,6 +441,7 @@ impl Default for AppConfig {
             ui_language: "en".to_string(),
             capsule_auto_hide: false,
             input_device: String::new(),
+            ui_scale: 1.0,
         }
     }
 }
@@ -560,6 +563,7 @@ impl AppConfig {
     }
 
     pub(crate) fn normalize_values(&mut self) {
+        self.ui_scale = crate::ui_scale::normalize(self.ui_scale);
         if !matches!(
             self.stt_aliyun_qwen_region.as_str(),
             crate::stt::aliyun_qwen3_asr::ALIYUN_QWEN3_ASR_REGION_CHINA_MAINLAND

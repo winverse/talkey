@@ -505,6 +505,8 @@
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
     "dictationMode": "ディクテーションモード",
+    "uiScale": "ウィンドウサイズ",
+    "uiScaleHint": "文字と画面をまとめて拡大し、ウィンドウも同じ比率で変更します。画面より大きい場合は画面に合わせます。",
     "close": "Close",
     "unsavedClose": "You have unsaved changes.",
     "discardAndClose": "Discard and close"
