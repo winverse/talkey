@@ -783,3 +783,68 @@ body,
   color: var(--color-text-primary);
   white-space: nowrap;
 }
+
+/* ── Talkey capsule: solid dark pill (Typeless-style) ─────────────────── */
+.capsule-dark {
+  position: relative;
+  overflow: hidden;
+  background: #0e0e0f;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.capsule-muted {
+  position: relative;
+  overflow: hidden;
+  background: #3a3a3c;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 6px 18px rgba(0, 0, 0, 0.2),
+    0 1px 4px rgba(0, 0, 0, 0.14);
+}
+.capsule-error {
+  position: relative;
+  overflow: hidden;
+  background: #3d1512;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 120, 100, 0.18),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+}
+.capsule-label {
+  background: rgba(14, 14, 15, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.capsule-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.95) 45%,
+    rgba(255, 255, 255, 0.42) 90%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: capsule-shimmer 1.8s linear infinite;
+}
+@keyframes capsule-shimmer {
+  from {
+    background-position: 110% 0;
+  }
+  to {
+    background-position: -110% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capsule-shimmer-text {
+    animation: none;
+    color: rgba(255, 255, 255, 0.8);
+    background: none;
+  }
+}

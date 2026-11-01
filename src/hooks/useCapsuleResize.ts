@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore, type PipelineState } from '../stores/appStore'
+import { getCapsuleShellSize, MIC_LABEL_SPACE, showsMicLabel } from '../components/Capsule/layout'
 
 interface CapsuleSize {
   width: number
@@ -127,28 +128,20 @@ function getSizeForState(
   hasError: boolean,
   contextMenuOpen: boolean,
   translationTargetMenuOpen = false,
+  notice: string | null = null,
+  translating = false,
 ): CapsuleSize {
   if (translationTargetMenuOpen) return { width: 360, height: 180 }
   if (contextMenuOpen) return { width: 220, height: 220 }
-  if (hasError) return { width: 200, height: 36 }
+  if (hasError) return getCapsuleShellSize('error')
   if (expanded) return { width: 220, height: 90 }
-  switch (state) {
-    case 'idle':
-      return { width: 36, height: 36 }
-    case 'preparing':
-      return { width: 180, height: 36 }
-    case 'recording':
-    case 'transcribing':
-    case 'polishing':
-      return { width: 200, height: 36 }
-    case 'outputting':
-      return { width: 144, height: 36 }
-    case 'ask_recording':
-    case 'ask_thinking':
-      return { width: 168, height: 36 }
-    default:
-      return { width: 36, height: 36 }
-  }
+  if (notice && state === 'idle') return getCapsuleShellSize(notice)
+  const shell = getCapsuleShellSize(state, translating)
+  // The microphone label sits above the capsule; reserve the same space
+  // below so the capsule keeps its vertical centre when the window resizes.
+  return showsMicLabel(state)
+    ? { width: shell.width, height: shell.height + MIC_LABEL_SPACE * 2 }
+    : shell
 }
 
 export function useCapsuleResize() {
@@ -159,6 +152,8 @@ export function useCapsuleResize() {
   const translationTargetMenuOpen = useAppStore((s) => s.translationTargetMenuOpen)
   const setContextMenuReady = useAppStore((s) => s.setContextMenuReady)
   const capsuleAutoHide = useAppStore((s) => s.config.capsule_auto_hide)
+  const capsuleNotice = useAppStore((s) => s.capsuleNotice)
+  const translating = useAppStore((s) => s.activeVoiceMode === 'translate')
   const initialized = useRef(false)
   const prevWindowSize = useRef<{ width: number; height: number } | null>(null)
   const effectGeneration = useRef(0)
@@ -175,6 +170,8 @@ export function useCapsuleResize() {
       hasError,
       contextMenuOpen,
       translationTargetMenuOpen,
+      capsuleNotice,
+      translating,
     )
     const windowWidth = size.width + 24
     const windowHeight = size.height + 24
@@ -182,7 +179,7 @@ export function useCapsuleResize() {
       capsuleAutoHide,
       contextMenuOpen,
       translationTargetMenuOpen,
-      capsuleExpanded,
+      capsuleExpanded: capsuleExpanded || capsuleNotice !== null,
       hasError,
       pipelineState,
     })
@@ -359,6 +356,8 @@ export function useCapsuleResize() {
     translationTargetMenuOpen,
     capsuleAutoHide,
     setContextMenuReady,
+    capsuleNotice,
+    translating,
   ])
 
   return getSizeForState(
@@ -367,5 +366,7 @@ export function useCapsuleResize() {
     hasError,
     contextMenuOpen,
     translationTargetMenuOpen,
+    capsuleNotice,
+    translating,
   )
 }

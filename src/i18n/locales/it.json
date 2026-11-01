@@ -263,6 +263,8 @@
   },
   "capsule": {
     "cancelRecording": "Annulla registrazione",
+    "finishRecording": "Finish dictation",
+    "cancelled": "Dictation cancelled",
     "translationTarget": "Lingua di destinazione",
     "translationTargets": "Lingue di destinazione",
     "preparing": "Preparazione...",

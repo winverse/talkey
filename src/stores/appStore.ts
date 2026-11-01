@@ -306,6 +306,9 @@ interface AppState {
   // Capsule
   capsuleExpanded: boolean
   setCapsuleExpanded: (expanded: boolean) => void
+  /** Short notice the capsule shows after the pipeline goes idle, e.g. after cancelling. */
+  capsuleNotice: 'cancelled' | null
+  setCapsuleNotice: (notice: 'cancelled' | null) => void
 
   // Connection test status
   sttTestStatus: TestStatus
@@ -878,6 +881,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   capsuleExpanded: false,
   setCapsuleExpanded: (capsuleExpanded) => set({ capsuleExpanded }),
+  capsuleNotice: null,
+  setCapsuleNotice: (capsuleNotice) => set({ capsuleNotice }),
 
   sttTestStatus: 'idle',
   setSttTestStatus: (sttTestStatus) => set({ sttTestStatus }),

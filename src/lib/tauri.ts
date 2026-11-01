@@ -21,6 +21,11 @@ export async function stopRecording(): Promise<void> {
   return invoke('stop_recording')
 }
 
+/** Name of the default microphone, or null when none is available. */
+export async function getInputDeviceName(): Promise<string | null> {
+  return invoke('get_input_device_name')
+}
+
 export async function abortRecording(): Promise<void> {
   return invoke('abort_recording')
 }

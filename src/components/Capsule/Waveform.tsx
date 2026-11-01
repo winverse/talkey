@@ -2,11 +2,17 @@ import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import { useAppStore } from '../../stores/appStore'
 
-const BAR_COUNT = 7
-const MIN_HEIGHT = 3
-const MAX_HEIGHT = 16
+interface WaveformProps {
+  bars?: number
+  minHeight?: number
+  maxHeight?: number
+}
 
-export function Waveform() {
+/** Live input level as bars; at rest the bars shrink to dots. */
+export function Waveform({ bars = 7, minHeight = 3, maxHeight = 16 }: WaveformProps) {
+  const BAR_COUNT = bars
+  const MIN_HEIGHT = minHeight
+  const MAX_HEIGHT = maxHeight
   const barsRef = useRef<(HTMLDivElement | null)[]>([])
   const rafRef = useRef<number>(0)
   const reduced = useReducedMotion()
@@ -29,7 +35,7 @@ export function Waveform() {
         const offset = Math.sin(Date.now() / 200 + i * 0.9) * 0.15
         const normalized = Math.max(0, Math.min(1, volume + offset))
         const height = MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * normalized
-        const opacity = Math.max(0.5, normalized)
+        const opacity = Math.max(0.55, normalized)
         bar.style.height = `${height}px`
         bar.style.opacity = `${opacity}`
       })
@@ -38,10 +44,10 @@ export function Waveform() {
 
     rafRef.current = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [reduced])
+  }, [reduced, MIN_HEIGHT, MAX_HEIGHT])
 
   return (
-    <div className="flex items-center justify-center gap-[3px] h-4">
+    <div className="flex items-center justify-center gap-[3px]" style={{ height: MAX_HEIGHT }}>
       {Array.from({ length: BAR_COUNT }).map((_, i) => (
         <div
           key={i}

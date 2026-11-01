@@ -125,6 +125,8 @@ mockIPC(
         return ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1']
       case 'read_credential':
         return 'preview-key'
+      case 'get_input_device_name':
+        return lang === 'ko' ? 'MacBook Pro 마이크' : 'MacBook Pro Microphone'
       case 'check_accessibility_permission':
         return true
       case 'get_hotkey_registration_error':
@@ -142,3 +144,21 @@ if (dark) document.documentElement.classList.add('dark')
 localStorage.setItem('ui_language', lang)
 
 await import('../main')
+
+// ?capsule=<state> previews the capsule (open preview.html?capsule=recording#capsule).
+const capsuleState = params.get('capsule')
+if (capsuleState) {
+  const { useAppStore } = await import('../stores/appStore')
+  document.body.style.background = params.get('bg') ?? '#f4f4f5'
+  if (capsuleState === 'cancelled') {
+    useAppStore.setState({ capsuleNotice: 'cancelled' })
+  } else {
+    useAppStore.setState({
+      pipelineState: capsuleState as never,
+      activeVoiceMode: params.get('translate') ? 'translate' : 'dictation',
+    } as never)
+  }
+  window.setInterval(() => {
+    useAppStore.setState({ audioVolume: 0.25 + Math.random() * 0.6 } as never)
+  }, 120)
+}

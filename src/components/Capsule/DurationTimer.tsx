@@ -3,7 +3,13 @@ import { useAppStore } from '../../stores/appStore'
 
 type RecordingKind = 'dictation' | 'ask'
 
-export function DurationTimer({ recordingKind = 'dictation' }: { recordingKind?: RecordingKind }) {
+export function DurationTimer({
+  recordingKind = 'dictation',
+  className = 'text-white/80',
+}: {
+  recordingKind?: RecordingKind
+  className?: string
+}) {
   const recordingDeadline = useAppStore((s) => s.recordingDeadline)
   const fallbackStartedAtRef = useRef(Date.now())
   const [now, setNow] = useState(Date.now())
@@ -23,7 +29,7 @@ export function DurationTimer({ recordingKind = 'dictation' }: { recordingKind?:
   const ss = String(seconds % 60).padStart(2, '0')
 
   return (
-    <span className="text-[11px] font-mono text-white/80 tabular-nums">
+    <span className={`text-[11px] font-mono tabular-nums ${className}`}>
       {mm}:{ss}
     </span>
   )

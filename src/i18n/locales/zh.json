@@ -263,6 +263,8 @@
   },
   "capsule": {
     "cancelRecording": "取消录音",
+    "finishRecording": "Finish dictation",
+    "cancelled": "Dictation cancelled",
     "translationTarget": "翻译目标",
     "translationTargets": "翻译目标列表",
     "preparing": "准备中...",

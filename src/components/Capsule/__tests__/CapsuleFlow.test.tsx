@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '../../../stores/appStore'
-import { setActiveTranslationTarget, stopAskFlow } from '../../../lib/tauri'
+import { abortRecording, setActiveTranslationTarget, stopAskFlow } from '../../../lib/tauri'
 import { Capsule } from '../index'
 
 vi.mock('framer-motion', () => ({
@@ -33,6 +33,7 @@ vi.mock('../../../hooks/useCapsuleResize', () => ({
 vi.mock('../../../lib/tauri', () => ({
   abortAskDictation: vi.fn().mockResolvedValue(undefined),
   abortRecording: vi.fn().mockResolvedValue(undefined),
+  getInputDeviceName: vi.fn().mockResolvedValue('MacBook Pro Microphone'),
   setActiveTranslationTarget: vi.fn().mockResolvedValue({
     targets: ['en', 'ja'],
     active_target: 'ja',
@@ -64,12 +65,42 @@ describe('Capsule flow states', () => {
     })
   })
 
-  it('renders preparing state', () => {
+  it('renders preparing state with the finish button disabled', () => {
     useAppStore.setState({ pipelineState: 'preparing' })
 
     render(<Capsule />)
 
-    expect(screen.getByText('capsule.preparing')).toBeInTheDocument()
+    expect(screen.getByTitle('capsule.preparing')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'capsule.finishRecording' })).toBeDisabled()
+  })
+
+  it('shows the microphone name above the recording capsule', async () => {
+    useAppStore.setState({ pipelineState: 'recording' })
+
+    render(<Capsule />)
+
+    expect(await screen.findByText('MacBook Pro Microphone')).toBeInTheDocument()
+  })
+
+  it('finishes recording with the check button and cancels with X', async () => {
+    useAppStore.setState({ pipelineState: 'recording' })
+
+    render(<Capsule />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'capsule.finishRecording' }))
+    expect(invoke).toHaveBeenCalledWith('stop_recording')
+
+    fireEvent.click(screen.getByRole('button', { name: 'capsule.cancelRecording' }))
+    await waitFor(() => expect(abortRecording).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(useAppStore.getState().capsuleNotice).toBe('cancelled'))
+  })
+
+  it('shows the cancelled notice while idle', () => {
+    useAppStore.setState({ pipelineState: 'idle', capsuleNotice: 'cancelled' })
+
+    render(<Capsule />)
+
+    expect(screen.getByText('capsule.cancelled')).toBeInTheDocument()
   })
 
   it('renders transcribing state with partial transcript when available', () => {
@@ -106,15 +137,13 @@ describe('Capsule flow states', () => {
   it('renders Ask recording in the capsule and stops Ask when clicked', () => {
     useAppStore.setState({ pipelineState: 'ask_recording' })
 
-    render(<Capsule />)
+    const { container } = render(<Capsule />)
 
-    expect(screen.getByText('ask.title')).toBeInTheDocument()
-    expect(screen.getByText('ask.title')).toHaveClass('whitespace-nowrap')
-    expect(screen.getByText('00:00')).toBeInTheDocument()
+    expect(screen.getByLabelText('ask.title')).toBeInTheDocument()
 
     const pointerUp = new Event('pointerup', { bubbles: true })
     Object.defineProperty(pointerUp, 'button', { value: 0 })
-    fireEvent(screen.getByText('ask.title'), pointerUp)
+    fireEvent(container.querySelector('.capsule-dark') as Element, pointerUp)
 
     expect(stopAskFlow).toHaveBeenCalledTimes(1)
   })
@@ -172,7 +201,7 @@ describe('Capsule flow states', () => {
     expect(useAppStore.getState().config.translation.active_target).toBe('ja')
   })
 
-  it('keeps the capsule shell at 200 by 36 and closes the target menu on Escape', async () => {
+  it('widens the capsule shell for the language chip and closes the target menu on Escape', async () => {
     useAppStore.setState({
       pipelineState: 'recording',
       activeVoiceMode: 'translate',
@@ -193,8 +222,8 @@ describe('Capsule flow states', () => {
       expect(screen.getByRole('button', { name: 'capsule.translationTarget en' })).toHaveFocus(),
     )
 
-    const shell = container.querySelector('.jelly-capsule-active') as HTMLElement
-    expect(shell.style.width).toBe('200px')
+    const shell = container.querySelector('.capsule-dark') as HTMLElement
+    expect(shell.style.width).toBe('190px')
     expect(shell.style.height).toBe('36px')
   })
 })

@@ -402,7 +402,9 @@ describe('useCapsuleResize async updates', () => {
     })
 
     await waitFor(() => {
-      expect(windowApiMocks.setPosition).toHaveBeenCalledWith(expect.objectContaining({ y: 100 }))
+      // Recording reserves mic-label space above and below (60 -> 112 px high),
+      // so the window moves up by half the growth to keep the capsule centred.
+      expect(windowApiMocks.setPosition).toHaveBeenCalledWith(expect.objectContaining({ y: 74 }))
     })
   })
 })

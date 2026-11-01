@@ -15,32 +15,30 @@ import { CapsuleContextMenu } from './CapsuleContextMenu'
 import { CapsuleAskRecording } from './CapsuleAskRecording'
 import { CapsuleAskThinking } from './CapsuleAskThinking'
 import { TranslateTargetMenu } from './TranslateTargetChip'
+import { CapsuleCancelled } from './CapsuleCancelled'
+import { MicLabel } from './MicLabel'
+import { getCapsuleShellSize, showsMicLabel } from './layout'
 
 const DRAG_THRESHOLD = 5
 
-function getCapsuleState(pipelineState: string, hasError: boolean) {
+function getCapsuleState(pipelineState: string, hasError: boolean, notice: string | null) {
   if (hasError) return 'error'
+  if (notice && pipelineState === 'idle') return notice
   return pipelineState
 }
 
-function getCapsuleShellSize(capsuleState: string) {
+function shellClass(capsuleState: string) {
   switch (capsuleState) {
     case 'idle':
-      return { width: 36, height: 36 }
-    case 'preparing':
-      return { width: 180, height: 36 }
-    case 'outputting':
-      return { width: 144, height: 36 }
-    case 'ask_recording':
-    case 'ask_thinking':
-      return { width: 168, height: 36 }
-    case 'recording':
+      return 'jelly-capsule text-neutral-700'
+    case 'error':
+      return 'capsule-error text-white'
     case 'transcribing':
     case 'polishing':
-    case 'error':
-      return { width: 200, height: 36 }
+    case 'ask_thinking':
+      return 'capsule-muted text-white'
     default:
-      return { width: 36, height: 36 }
+      return 'capsule-dark text-white'
   }
 }
 
@@ -53,6 +51,8 @@ export function Capsule() {
   const setContextMenuReady = useAppStore((s) => s.setContextMenuReady)
   const translationTargetMenuOpen = useAppStore((s) => s.translationTargetMenuOpen)
   const setTranslationTargetMenuOpen = useAppStore((s) => s.setTranslationTargetMenuOpen)
+  const capsuleNotice = useAppStore((s) => s.capsuleNotice)
+  const translating = useAppStore((s) => s.activeVoiceMode === 'translate')
   const { stopRecording, isRecording } = useRecording()
 
   const dragStart = useRef<{ x: number; y: number } | null>(null)
@@ -61,8 +61,8 @@ export function Capsule() {
   useCapsuleResize()
 
   const hasError = pipelineError !== null
-  const capsuleState = getCapsuleState(pipelineState, hasError)
-  const capsuleShellSize = getCapsuleShellSize(capsuleState)
+  const capsuleState = getCapsuleState(pipelineState, hasError, capsuleNotice)
+  const capsuleShellSize = getCapsuleShellSize(capsuleState, translating)
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
@@ -136,17 +136,18 @@ export function Capsule() {
       style={{ background: 'transparent' }}
       onContextMenu={handleContextMenu}
     >
-      {/* Persistent outer shell — jelly capsule */}
+      {showsMicLabel(capsuleState) && (
+        <MicLabel
+          key={capsuleState === 'ask_recording' ? 'ask' : 'dictation'}
+          capsuleWidth={capsuleShellSize.width}
+        />
+      )}
+
+      {/* Persistent outer shell */}
       <motion.div
         layout
         transition={{ layout: { duration: 0.2, ease: [0.2, 0, 0, 1] } }}
-        className={`absolute left-3 rounded-full pointer-events-auto shrink-0 ${
-          capsuleState === 'error'
-            ? 'jelly-capsule-error'
-            : capsuleState === 'idle'
-              ? 'jelly-capsule text-neutral-700'
-              : 'jelly-capsule-active text-white'
-        }`}
+        className={`absolute left-3 rounded-full pointer-events-auto shrink-0 ${shellClass(capsuleState)}`}
         style={capsuleShellSize}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -170,6 +171,7 @@ export function Capsule() {
             {capsuleState === 'ask_recording' && <CapsuleAskRecording />}
             {capsuleState === 'ask_thinking' && <CapsuleAskThinking />}
             {capsuleState === 'error' && <CapsuleError />}
+            {capsuleState === 'cancelled' && <CapsuleCancelled />}
           </motion.div>
         </AnimatePresence>
       </motion.div>

@@ -298,6 +298,16 @@ where
     )
 }
 
+/// Name of the system default input device, shown above the capsule while
+/// recording. `None` when no input device is available.
+pub fn default_input_device_name() -> Option<String> {
+    cpal::default_host()
+        .default_input_device()?
+        .description()
+        .ok()
+        .map(|description| description.name().to_string())
+}
+
 fn run_capture(
     config: AudioConfig,
     sender: mpsc::Sender<Vec<u8>>,

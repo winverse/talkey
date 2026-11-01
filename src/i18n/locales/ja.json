@@ -263,6 +263,8 @@
   },
   "capsule": {
     "cancelRecording": "録音をキャンセル",
+    "finishRecording": "Finish dictation",
+    "cancelled": "Dictation cancelled",
     "translationTarget": "翻訳先",
     "translationTargets": "翻訳先一覧",
     "preparing": "準備中...",

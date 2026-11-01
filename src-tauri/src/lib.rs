@@ -541,6 +541,11 @@ async fn stop_recording(state: tauri::State<'_, pipeline::PipelineHandle>) -> Re
 }
 
 #[tauri::command]
+fn get_input_device_name() -> Option<String> {
+    audio::capture::default_input_device_name()
+}
+
+#[tauri::command]
 fn abort_recording(state: tauri::State<'_, pipeline::PipelineHandle>) -> Result<(), String> {
     state.abort();
     Ok(())
@@ -1219,6 +1224,7 @@ pub fn run() {
             start_recording,
             stop_recording,
             abort_recording,
+            get_input_device_name,
             commands::ask::ask_anything,
             commands::ask::start_ask_dictation,
             commands::ask::stop_ask_dictation,
