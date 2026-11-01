@@ -540,9 +540,29 @@ async fn stop_recording(state: tauri::State<'_, pipeline::PipelineHandle>) -> Re
     state.stop().await.map_err(|e| e.to_string())
 }
 
+/// Shows the main window, optionally navigating to `hash` first.
+fn show_main_window_at(app: &tauri::AppHandle, hash: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        if !hash.is_empty() {
+            let _ = window.emit("navigate", hash);
+        }
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// Shows the main window and sends it a tray event such as `tray:history`.
+fn show_main_window_with(app: &tauri::AppHandle, event: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit(event, ());
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 #[tauri::command]
 fn get_input_device_name() -> Option<String> {
-    audio::capture::default_input_device_name()
+    audio::capture::active_input_device_name()
 }
 
 #[tauri::command]
@@ -1006,9 +1026,9 @@ pub fn run() {
             spawn_hotkey_supervisor(app_handle.clone());
 
             // System tray
-            let tray_menu =
-                tray::build_tray_menu(&app_handle, false, true, initial_config.capsule_auto_hide)
-                    .map_err(|e| anyhow::anyhow!("Failed to build tray menu: {}", e))?;
+            audio::capture::set_preferred_input_device(&initial_config.input_device);
+            let tray_menu = tray::build_tray_menu(&app_handle)
+                .map_err(|e| anyhow::anyhow!("Failed to build tray menu: {}", e))?;
 
             // macOS menu bar icons are monochrome templates that follow the
             // light/dark menu bar; other platforms keep the full-color app icon.
@@ -1030,89 +1050,42 @@ pub fn run() {
                     "quit" => {
                         app.exit(0);
                     }
-                    "show_hide" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let visible = window.is_visible().unwrap_or(false);
-                            if visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                            refresh_tray(app);
-                        }
-                    }
-                    "record" => {
-                        let handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let pipeline = handle.state::<pipeline::PipelineHandle>();
-                            if pipeline.current_state() == pipeline::PipelineState::Idle {
-                                if let Err(e) = pipeline.start().await {
-                                    tracing::error!("Tray start recording failed: {}", e);
-                                }
-                            } else if pipeline.current_state() == pipeline::PipelineState::Recording
-                            {
-                                if let Err(e) = pipeline.stop().await {
-                                    tracing::error!("Tray stop recording failed: {}", e);
-                                }
-                            }
-                        });
-                    }
-                    "toggle_capsule_auto_hide" => {
-                        let handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let config_state = handle.state::<storage::ConfigManager>();
-                            let enabled = config_state
-                                .load()
+                    "open_home" => show_main_window_at(app, "#/"),
+                    "history" => show_main_window_with(app, "tray:history"),
+                    "add_word" => show_main_window_with(app, "tray:add-word"),
+                    "settings" => show_main_window_with(app, "tray:settings"),
+                    id => {
+                        let device = if id == tray::MICROPHONE_DEFAULT_ID {
+                            Some(String::new())
+                        } else {
+                            id.strip_prefix(tray::MICROPHONE_ID_PREFIX)
+                                .map(str::to_string)
+                        };
+                        if let Some(device) = device {
+                            let handle = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let config_state = handle.state::<storage::ConfigManager>();
+                                if let Err(e) = commands::config::save_input_device(
+                                    &handle,
+                                    &config_state,
+                                    &device,
+                                )
                                 .await
-                                .map(|config| !config.capsule_auto_hide)
-                                .unwrap_or(true);
-                            if let Err(e) = commands::config::save_capsule_auto_hide(
-                                &handle,
-                                &config_state,
-                                enabled,
-                            )
-                            .await
-                            {
-                                tracing::error!("Tray capsule visibility toggle failed: {}", e);
-                            }
-                        });
-                    }
-                    "settings" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("tray:settings", ());
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            refresh_tray(app);
+                                {
+                                    tracing::error!("Tray microphone selection failed: {}", e);
+                                }
+                            });
                         }
                     }
-                    "history" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("tray:history", ());
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            refresh_tray(app);
-                        }
-                    }
-                    "account" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("navigate", "#/account");
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            refresh_tray(app);
-                        }
-                    }
-                    "about" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("tray:about", ());
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            refresh_tray(app);
-                        }
-                    }
-                    _ => {}
                 })
+                // macOS opens the menu on click, like other menu bar apps.
+                // Windows and Linux open the window on left click and the
+                // menu on right click.
+                .show_menu_on_left_click(cfg!(target_os = "macos"))
                 .on_tray_icon_event(|tray, event| {
+                    if cfg!(target_os = "macos") {
+                        return;
+                    }
                     let should_show = matches!(
                         event,
                         TrayIconEvent::Click {
@@ -1125,12 +1098,7 @@ pub fn run() {
                         }
                     );
                     if should_show {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            refresh_tray(app);
-                        }
+                        show_main_window_at(tray.app_handle(), "");
                     }
                 })
                 .build(app)?;
@@ -1138,6 +1106,7 @@ pub fn run() {
             app.manage(TrayHandle {
                 tray: Mutex::new(tray),
             });
+            tray::spawn_microphone_watcher(app_handle.clone());
 
             // Close-to-tray: intercept window close
             if let Some(main_window) = app.get_webview_window("main") {

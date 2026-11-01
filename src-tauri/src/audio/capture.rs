@@ -298,14 +298,74 @@ where
     )
 }
 
-/// Name of the system default input device, shown above the capsule while
-/// recording. `None` when no input device is available.
-pub fn default_input_device_name() -> Option<String> {
-    cpal::default_host()
-        .default_input_device()?
+/// Microphone chosen in the tray menu. `None` records from the system default.
+static PREFERRED_INPUT_DEVICE: Mutex<Option<String>> = Mutex::new(None);
+
+/// Sets the microphone to record from. An empty name means the system default.
+pub fn set_preferred_input_device(name: &str) {
+    let name = name.trim();
+    *PREFERRED_INPUT_DEVICE
+        .lock()
+        .unwrap_or_else(|error| error.into_inner()) = (!name.is_empty()).then(|| name.to_string());
+}
+
+fn preferred_input_device() -> Option<String> {
+    PREFERRED_INPUT_DEVICE
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .clone()
+}
+
+fn device_name(device: &cpal::Device) -> Option<String> {
+    device
         .description()
         .ok()
         .map(|description| description.name().to_string())
+}
+
+/// Names of the available input devices, without duplicates, in host order.
+pub fn input_device_names() -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    if let Ok(devices) = cpal::default_host().input_devices() {
+        for name in devices.filter_map(|device| device_name(&device)) {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+/// Name of the system default input device.
+pub fn system_default_input_device_name() -> Option<String> {
+    cpal::default_host()
+        .default_input_device()
+        .as_ref()
+        .and_then(device_name)
+}
+
+/// The preferred microphone when it is connected, otherwise the system default.
+fn select_input_device(host: &cpal::Host) -> Option<cpal::Device> {
+    if let Some(preferred) = preferred_input_device() {
+        let found = host.input_devices().ok().and_then(|mut devices| {
+            devices.find(|device| device_name(device).as_deref() == Some(preferred.as_str()))
+        });
+        if found.is_some() {
+            return found;
+        }
+        tracing::warn!(
+            "Preferred input device {:?} is not connected; using the system default",
+            preferred
+        );
+    }
+    host.default_input_device()
+}
+
+/// Name of the device the next recording will use, shown above the capsule
+/// while recording. `None` when no input device is available.
+pub fn active_input_device_name() -> Option<String> {
+    let host = cpal::default_host();
+    select_input_device(&host).as_ref().and_then(device_name)
 }
 
 fn run_capture(
@@ -317,9 +377,8 @@ fn run_capture(
     startup_notifier: &mut CaptureStartupNotifier,
 ) -> Result<()> {
     let host = cpal::default_host();
-    let device = host
-        .default_input_device()
-        .ok_or_else(|| anyhow::anyhow!("No input device available"))?;
+    let device =
+        select_input_device(&host).ok_or_else(|| anyhow::anyhow!("No input device available"))?;
 
     let device_description = device
         .description()

@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
+import { onDictionaryWordFocus } from '../../lib/dictionaryFocus'
 import {
   addCorrectionRule,
   addDictionaryEntry,
@@ -87,6 +88,7 @@ export function DictionaryPane() {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
   const [committingImport, setCommittingImport] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const wordInputRef = useRef<HTMLInputElement>(null)
   const importButtonRef = useRef<HTMLButtonElement>(null)
   const exportButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -118,6 +120,15 @@ export function DictionaryPane() {
     setDictionary(nextDictionary)
     setCorrectionRules(nextCorrections)
   }, [setCorrectionRules, setDictionary])
+
+  useEffect(
+    () =>
+      onDictionaryWordFocus(() => {
+        setActiveSection('words')
+        window.setTimeout(() => wordInputRef.current?.focus(), 0)
+      }),
+    [],
+  )
 
   const closeExportMenu = useCallback(() => {
     setExportMenuOpen(false)
@@ -363,6 +374,7 @@ export function DictionaryPane() {
         <>
           <div className="grid grid-cols-1 gap-2 min-[840px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
             <input
+              ref={wordInputRef}
               value={word}
               onChange={(event) => setWord(event.target.value)}
               placeholder={t('dictionary.word')}

@@ -16,6 +16,7 @@ import { getHistory } from '../lib/tauri'
 import { toast } from '../components/toast-service'
 import { capsuleErrorKeyFromPayload, type PipelineErrorPayload } from '../lib/capsuleError'
 import { invalidateCloudSessionOnce } from '../lib/cloud-session'
+import { requestDictionaryWordFocus } from '../lib/dictionaryFocus'
 import {
   managedCloudIncidentFromPipelineError,
   useCloudServiceStore,
@@ -183,6 +184,10 @@ export function useTauriEvents() {
     })
     addListener<void>('tray:history', () => {
       window.location.hash = '#/history'
+    })
+    addListener<void>('tray:add-word', () => {
+      window.location.hash = '#/dictionary'
+      requestDictionaryWordFocus()
     })
     addListener<string>('navigate', (hash) => {
       window.location.hash = hash

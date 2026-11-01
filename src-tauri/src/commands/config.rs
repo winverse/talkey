@@ -13,6 +13,9 @@ use tauri::{Emitter, Manager, Window};
 
 fn config_patch_between(previous: &storage::AppConfig, next: &storage::AppConfig) -> Value {
     let mut patch = Map::new();
+    if previous.input_device != next.input_device {
+        patch.insert("input_device".to_string(), json!(next.input_device));
+    }
     if previous.capsule_auto_hide != next.capsule_auto_hide {
         patch.insert(
             "capsule_auto_hide".to_string(),
@@ -224,6 +227,24 @@ pub(crate) async fn save_capsule_auto_hide(
     Ok(())
 }
 
+/// Saves the microphone picked in the tray menu. An empty name means the
+/// system default.
+pub(crate) async fn save_input_device(
+    app: &tauri::AppHandle,
+    state: &storage::ConfigManager,
+    name: &str,
+) -> Result<(), String> {
+    let mut config = state.load().await.map_err(|e| e.to_string())?;
+    crate::audio::capture::set_preferred_input_device(name);
+    if config.input_device != name {
+        config.input_device = name.to_string();
+        state.save(&config).await.map_err(|e| e.to_string())?;
+        emit_config_patch(app, &json!({ "input_device": name }));
+    }
+    crate::refresh_tray(app);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_config(
     state: tauri::State<'_, storage::ConfigManager>,
@@ -286,8 +307,12 @@ pub async fn update_config(
     }
 
     update_runtime_caches(&cache, &ask_cache, &role_cache, &close_tray_cache, &config);
+    crate::audio::capture::set_preferred_input_device(&config.input_device);
     emit_config_patch(&app, &patch);
-    if patch.get("ui_language").is_some() || patch.get("capsule_auto_hide").is_some() {
+    if patch.get("ui_language").is_some()
+        || patch.get("capsule_auto_hide").is_some()
+        || patch.get("input_device").is_some()
+    {
         crate::refresh_tray(&app);
     }
     if refresh_provider_connections {

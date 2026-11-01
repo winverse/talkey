@@ -239,6 +239,8 @@ export interface AppConfig {
   history_max_entries: number
   ui_language: string
   capsule_auto_hide: boolean
+  /** Microphone picked in the tray menu. Empty records from the system default. */
+  input_device?: string
 }
 
 export type TestStatus = 'idle' | 'testing' | 'success' | 'error'

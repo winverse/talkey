@@ -44,6 +44,7 @@ Talkey is based on OpenTypeless v1.1.64. Everything below is new or fixed in Tal
 - **Separate History and Dictionary pages,** and settings that open as a dialog.
 - **Model picker for Claude:** choose the polish model from a list instead of typing its ID.
 - **Free build:** no upgrade prompts. Bring your own API key or run Whisper locally.
+- **Menu bar menu:** open Home, History, or Settings, add a dictionary word, and pick the microphone from the menu bar. Talkey remembers the microphone and falls back to the system default when it is unplugged.
 - **Automatic import from OpenTypeless:** on first launch, Talkey copies your settings, history, dictionary and saved API keys from OpenTypeless. The OpenTypeless data is left untouched.
 
 <p align="center">
