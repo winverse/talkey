@@ -25,13 +25,16 @@ fn clipboard_copy_sentinel() -> String {
     )
 }
 
+/// AppleScript that presses Command+C by the C key's position (key code 8),
+/// so it also works while a non-Latin input source such as Korean is active.
+#[cfg(target_os = "macos")]
+const MAC_COPY_SCRIPT: &str =
+    r#"tell application "System Events" to key code 8 using command down"#;
+
 #[cfg(target_os = "macos")]
 fn copy_selected_text_to_clipboard() -> bool {
     match std::process::Command::new("/usr/bin/osascript")
-        .args([
-            "-e",
-            r#"tell application "System Events" to keystroke "c" using command down"#,
-        ])
+        .args(["-e", MAC_COPY_SCRIPT])
         .status()
     {
         Ok(status) if status.success() => true,
@@ -98,6 +101,14 @@ pub fn capture_selected_text() -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mac_copy_uses_the_key_position_not_the_character() {
+        // `keystroke "c"` is dropped while the Korean input source is active.
+        assert!(MAC_COPY_SCRIPT.contains("key code 8 using command down"));
+        assert!(!MAC_COPY_SCRIPT.contains("keystroke"));
+    }
     use super::*;
 
     #[test]

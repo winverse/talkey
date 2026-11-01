@@ -205,13 +205,18 @@ fn restore_clipboard_if_safe(
     clear_pending_clipboard_restore(restore_id);
 }
 
+/// AppleScript that presses Command+V. It uses the V key's position (key
+/// code 9) rather than `keystroke "v"`: with a non-Latin input source such as
+/// 2-Set Korean active, no key types "v", and `keystroke "v"` is silently
+/// dropped while osascript still exits 0.
+#[cfg(target_os = "macos")]
+pub(crate) const MAC_PASTE_SCRIPT: &str =
+    r#"tell application "System Events" to key code 9 using command down"#;
+
 #[cfg(target_os = "macos")]
 fn simulate_paste(_shortcut: PasteShortcut) -> Result<(), AppError> {
     let status = std::process::Command::new("osascript")
-        .args([
-            "-e",
-            r#"tell application "System Events" to keystroke "v" using command down"#,
-        ])
+        .args(["-e", MAC_PASTE_SCRIPT])
         .status()
         .map_err(|e| AppError::Output(format!("osascript error: {}", e)))?;
     if !status.success() {
@@ -326,6 +331,14 @@ impl TextOutput for ClipboardOutput {
 
 #[cfg(test)]
 mod tests {
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mac_paste_uses_the_key_position_not_the_character() {
+        // `keystroke "v"` is dropped while the Korean input source is active.
+        assert!(MAC_PASTE_SCRIPT.contains("key code 9 using command down"));
+        assert!(!MAC_PASTE_SCRIPT.contains("keystroke"));
+    }
     use super::*;
 
     #[test]
