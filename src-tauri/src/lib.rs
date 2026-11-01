@@ -1010,12 +1010,20 @@ pub fn run() {
                 tray::build_tray_menu(&app_handle, false, true, initial_config.capsule_auto_hide)
                     .map_err(|e| anyhow::anyhow!("Failed to build tray menu: {}", e))?;
 
-            let tray = TrayIconBuilder::new()
-                .icon(
-                    app.default_window_icon()
-                        .expect("default window icon missing")
-                        .clone(),
-                )
+            // macOS menu bar icons are monochrome templates that follow the
+            // light/dark menu bar; other platforms keep the full-color app icon.
+            #[cfg(target_os = "macos")]
+            let tray_builder = TrayIconBuilder::new()
+                .icon(tauri::include_image!("icons/tray-template.png"))
+                .icon_as_template(true);
+            #[cfg(not(target_os = "macos"))]
+            let tray_builder = TrayIconBuilder::new().icon(
+                app.default_window_icon()
+                    .expect("default window icon missing")
+                    .clone(),
+            );
+
+            let tray = tray_builder
                 .menu(&tray_menu)
                 .tooltip("Talkey")
                 .on_menu_event(move |app, event| match event.id.as_ref() {
