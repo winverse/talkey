@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+
+## [Talkey 0.1.0] - 2026-11-01
+
+First release of Talkey, a fork of OpenTypeless v1.1.64. Entries below this one are from OpenTypeless.
+
+### Added
+- Home screen with usage insights, streaks and a GitHub-style activity grid; separate History and Dictionary pages; settings open as a dialog.
+- Claude model picker in AI polish settings.
+- Automatic first-run import of OpenTypeless settings, history, dictionary and saved API keys.
+- Dictionary words are sent to Whisper providers as a `prompt` hint (400 characters at most).
+
+### Changed
+- Renamed to Talkey with a new icon and the bundle identifier `com.winverse.talkey`.
+- Korean-aware polish prompt: removes fillers, resolves self-corrections and trailing repeats, fixes recognition errors from the dictionary.
+- Free build: upgrade prompts removed, auto-updater disabled.
+- Larger default window (1280x860).
+
+### Fixed
+- Lone right-hand modifier keys (Right Command/Win, Right Option/Alt, Right Control, Right Shift) can be recorded and used as shortcuts on macOS and Windows.
+
 ## [1.1.48] - 2026-07-08
 
 ### Added
