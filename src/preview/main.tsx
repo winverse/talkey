@@ -158,7 +158,10 @@ if (capsuleState) {
       activeVoiceMode: params.get('translate') ? 'translate' : 'dictation',
     } as never)
   }
+  // Raw RMS like the backend sends: speech bursts around 0.01-0.15 with pauses.
   window.setInterval(() => {
-    useAppStore.setState({ audioVolume: 0.25 + Math.random() * 0.6 } as never)
-  }, 120)
+    const speaking = Math.sin(Date.now() / 700) > -0.3
+    const rms = speaking ? 0.01 + Math.random() * 0.14 : 0.001 + Math.random() * 0.002
+    useAppStore.setState({ audioVolume: rms } as never)
+  }, 50)
 }

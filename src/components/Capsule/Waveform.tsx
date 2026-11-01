@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import { useAppStore } from '../../stores/appStore'
+import { levelFromRms } from './audioLevel'
 
 interface WaveformProps {
   bars?: number
@@ -8,7 +9,13 @@ interface WaveformProps {
   maxHeight?: number
 }
 
-/** Live input level as bars; at rest the bars shrink to dots. */
+/** How often the waveform scrolls one bar to the left. */
+const SHIFT_MS = 60
+
+/**
+ * Live input level as a scrolling waveform: the newest level enters on the
+ * right, so speech shows as moving peaks and silence as a row of dots.
+ */
 export function Waveform({ bars = 7, minHeight = 3, maxHeight = 16 }: WaveformProps) {
   const BAR_COUNT = bars
   const MIN_HEIGHT = minHeight
@@ -18,33 +25,42 @@ export function Waveform({ bars = 7, minHeight = 3, maxHeight = 16 }: WaveformPr
   const reduced = useReducedMotion()
 
   useEffect(() => {
-    if (reduced) {
-      // Static bars at mid-height when reduced motion is preferred
-      barsRef.current.forEach((bar) => {
-        if (!bar) return
-        bar.style.height = `${(MIN_HEIGHT + MAX_HEIGHT) / 2}px`
-        bar.style.opacity = '0.7'
-      })
-      return
+    const paint = (index: number, level: number) => {
+      const bar = barsRef.current[index]
+      if (!bar) return
+      bar.style.height = `${MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * level}px`
+      bar.style.opacity = `${0.55 + 0.45 * level}`
     }
 
-    const animate = () => {
-      const volume = useAppStore.getState().audioVolume
-      barsRef.current.forEach((bar, i) => {
-        if (!bar) return
-        const offset = Math.sin(Date.now() / 200 + i * 0.9) * 0.15
-        const normalized = Math.max(0, Math.min(1, volume + offset))
-        const height = MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * normalized
-        const opacity = Math.max(0.55, normalized)
-        bar.style.height = `${height}px`
-        bar.style.opacity = `${opacity}`
+    if (reduced) {
+      // No scrolling: every bar follows the current level together.
+      const unsubscribe = useAppStore.subscribe((state) => {
+        const level = levelFromRms(state.audioVolume)
+        for (let i = 0; i < BAR_COUNT; i++) paint(i, level)
       })
+      return unsubscribe
+    }
+
+    const history: number[] = new Array(BAR_COUNT).fill(0)
+    let smoothed = 0
+    let lastShift = 0
+
+    const animate = (now: number) => {
+      const target = levelFromRms(useAppStore.getState().audioVolume)
+      // Rise quickly when speech starts, fall back more slowly.
+      smoothed += (target - smoothed) * (target > smoothed ? 0.6 : 0.2)
+      if (now - lastShift >= SHIFT_MS) {
+        history.shift()
+        history.push(smoothed)
+        lastShift = now
+        history.forEach((level, i) => paint(i, level))
+      }
       rafRef.current = requestAnimationFrame(animate)
     }
 
     rafRef.current = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [reduced, MIN_HEIGHT, MAX_HEIGHT])
+  }, [reduced, BAR_COUNT, MIN_HEIGHT, MAX_HEIGHT])
 
   return (
     <div className="flex items-center justify-center gap-[3px]" style={{ height: MAX_HEIGHT }}>
@@ -57,8 +73,8 @@ export function Waveform({ bars = 7, minHeight = 3, maxHeight = 16 }: WaveformPr
           className="w-[2px] rounded-full bg-white/80"
           style={{
             height: `${MIN_HEIGHT}px`,
-            opacity: 0.5,
-            transition: 'height 75ms ease-out, opacity 75ms ease-out',
+            opacity: 0.55,
+            transition: 'height 60ms linear, opacity 60ms linear',
           }}
         />
       ))}
