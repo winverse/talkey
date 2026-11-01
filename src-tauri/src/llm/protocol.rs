@@ -147,6 +147,33 @@ fn normalize_anthropic_model(model: &str) -> String {
     }
 }
 
+/// Whether an Anthropic model still accepts `temperature`.
+///
+/// Claude Opus 4.7, Opus 4.8 and every Claude 5 model answer a request that
+/// sets it with HTTP 400 "`temperature` is deprecated for this model". Those
+/// models take `output_config.effort` instead. Claude 3.x and 4.0-4.6 accept
+/// `temperature`, and so do non-Claude models behind Anthropic-compatible APIs.
+fn anthropic_model_accepts_temperature(model: &str) -> bool {
+    let model = model.to_ascii_lowercase();
+    let Some(rest) = model.strip_prefix("claude-") else {
+        return true;
+    };
+    let mut parts = rest.split('-');
+    let family = parts.next().unwrap_or_default();
+    // Claude 3 names put the version first: claude-3-5-sonnet-20241022.
+    if family.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    let major = parts.next().and_then(|part| part.parse::<u32>().ok());
+    // A date suffix such as claude-sonnet-4-20250514 is not a minor version.
+    let minor = parts
+        .next()
+        .and_then(|part| part.parse::<u32>().ok())
+        .filter(|minor| *minor < 100)
+        .unwrap_or(0);
+    matches!(major, Some(major) if major < 4 || (major == 4 && minor <= 6))
+}
+
 pub fn build_chat_body(
     provider: &str,
     base_url: &str,
@@ -172,13 +199,25 @@ pub fn build_chat_body(
                 }
             }
 
+            let model = normalize_anthropic_model(model);
             let mut body = json!({
-                "model": normalize_anthropic_model(model),
+                "model": model,
                 "messages": anthropic_messages,
                 "max_tokens": max_tokens,
-                "temperature": temperature.clamp(0.0, 1.0),
                 "stream": stream
             });
+            if anthropic_model_accepts_temperature(&model) {
+                body.as_object_mut().unwrap().insert(
+                    "temperature".to_string(),
+                    json!(temperature.clamp(0.0, 1.0)),
+                );
+            } else {
+                // Polishing is short and latency-sensitive, so keep adaptive
+                // thinking to a minimum on models that think by default.
+                body.as_object_mut()
+                    .unwrap()
+                    .insert("output_config".to_string(), json!({ "effort": "low" }));
+            }
             if !system_parts.is_empty() {
                 body.as_object_mut().unwrap().insert(
                     "system".to_string(),
@@ -326,6 +365,64 @@ mod tests {
             chat_endpoint("claude", "https://openrouter.ai/api/v1").unwrap(),
             "https://openrouter.ai/api/v1/chat/completions"
         );
+    }
+
+    #[test]
+    fn anthropic_temperature_support_matches_the_api() {
+        // Checked against api.anthropic.com on 2026-11-01.
+        for model in [
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "claude-opus-4-5-20251101",
+            "claude-haiku-4-5-20251001",
+            "claude-sonnet-4-5-20250929",
+            "claude-sonnet-4-20250514",
+            "claude-3-5-sonnet-20241022",
+            "glm-4.6",
+        ] {
+            assert!(anthropic_model_accepts_temperature(model), "{model}");
+        }
+        for model in [
+            "claude-haiku-5-5",
+            "claude-sonnet-5-5",
+            "claude-opus-5-5",
+            "claude-fable-5-1",
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-fable-5",
+            "claude-opus-4-8",
+            "claude-opus-4-7",
+        ] {
+            assert!(!anthropic_model_accepts_temperature(model), "{model}");
+        }
+    }
+
+    #[test]
+    fn new_claude_models_get_low_effort_instead_of_temperature() {
+        let body = build_chat_body(
+            "claude",
+            "https://api.anthropic.com/v1",
+            "claude-haiku-5-5",
+            messages(),
+            256,
+            0.3,
+            true,
+        );
+
+        assert!(body.get("temperature").is_none());
+        assert_eq!(body["output_config"]["effort"], "low");
+
+        let older = build_chat_body(
+            "claude",
+            "https://api.anthropic.com/v1",
+            "claude-haiku-4-5",
+            messages(),
+            256,
+            0.3,
+            true,
+        );
+        assert_eq!(older["temperature"], 0.3);
+        assert!(older.get("output_config").is_none());
     }
 
     #[test]
