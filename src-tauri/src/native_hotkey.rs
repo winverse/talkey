@@ -1106,7 +1106,7 @@ mod platform {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         CallNextHookEx, DispatchMessageW, GetMessageW, PeekMessageW, PostThreadMessageW,
         SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, HC_ACTION, HHOOK,
-        KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PM_NOREMOVE, WH_KEYBOARD_LL, WM_QUIT,
+        KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_INJECTED, MSG, PM_NOREMOVE, WH_KEYBOARD_LL, WM_QUIT,
     };
 
     const STARTUP_TIMEOUT: Duration = Duration::from_secs(3);
@@ -1122,6 +1122,10 @@ mod platform {
     const VK_RCONTROL: u32 = 0xA3;
     const VK_RMENU: u32 = 0xA5;
     const VK_RWIN: u32 = 0x5C;
+    const VK_HANGUL: u32 = 0x15;
+    const VK_HANJA: u32 = 0x19;
+    const SCAN_CONTROL: u32 = 0x1D;
+    const SCAN_ALT: u32 = 0x38;
 
     static HOOK_CONTEXT: AtomicPtr<CallbackContext> = AtomicPtr::new(ptr::null_mut());
 
@@ -1376,14 +1380,51 @@ mod platform {
         if code == HC_ACTION as i32 && lparam != 0 {
             let keyboard = *(lparam as *const KBDLLHOOKSTRUCT);
             let injected = (keyboard.flags & LLKHF_INJECTED) != 0;
-            if (!injected || accept_synthetic_events())
-                && dispatch_keyboard_event(keyboard.vkCode, wparam)
+            let extended = (keyboard.flags & LLKHF_EXTENDED) != 0;
+            let vk_code = normalize_vk(keyboard.vkCode, keyboard.scanCode, extended);
+            if (!injected || accept_synthetic_events()) && dispatch_keyboard_event(vk_code, wparam)
             {
                 return 1;
             }
         }
 
         CallNextHookEx(ptr::null_mut(), code, wparam, lparam)
+    }
+
+    /// Korean keyboard types such as `kbd101a` (type 8, subtype 3) turn the
+    /// right Alt and right Ctrl keys into 한/영 (`VK_HANGUL`) and 한자
+    /// (`VK_HANJA`). Map them back by key position (extended scan code) so
+    /// RightAlt / RightCtrl bindings still fire. Dedicated 한/영·한자 keys use
+    /// other scan codes and are left alone.
+    fn normalize_vk(vk_code: u32, scan_code: u32, extended: bool) -> u32 {
+        match (vk_code, scan_code, extended) {
+            (VK_HANGUL, SCAN_ALT, true) => VK_RMENU,
+            (VK_HANJA, SCAN_CONTROL, true) => VK_RCONTROL,
+            _ => vk_code,
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn korean_layout_right_keys_map_to_right_modifiers() {
+            assert_eq!(normalize_vk(VK_HANJA, SCAN_CONTROL, true), VK_RCONTROL);
+            assert_eq!(normalize_vk(VK_HANGUL, SCAN_ALT, true), VK_RMENU);
+        }
+
+        #[test]
+        fn other_keys_are_unchanged() {
+            // Real right modifiers on a plain layout.
+            assert_eq!(normalize_vk(VK_RCONTROL, SCAN_CONTROL, true), VK_RCONTROL);
+            assert_eq!(normalize_vk(VK_RMENU, SCAN_ALT, true), VK_RMENU);
+            // Dedicated 한/영 (0xF2) and 한자 (0xF1) keys.
+            assert_eq!(normalize_vk(VK_HANGUL, 0xF2, false), VK_HANGUL);
+            assert_eq!(normalize_vk(VK_HANJA, 0xF1, false), VK_HANJA);
+            // Left Ctrl position is not extended.
+            assert_eq!(normalize_vk(VK_HANJA, SCAN_CONTROL, false), VK_HANJA);
+        }
     }
 
     fn dispatch_keyboard_event(vk_code: u32, message: WPARAM) -> bool {

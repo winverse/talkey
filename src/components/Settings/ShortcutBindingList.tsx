@@ -196,8 +196,11 @@ export function HotkeyRecorder({
       if (event.shiftKey) parts.push('Shift')
       if (!isMac && event.metaKey) parts.push('Meta')
 
-      if (['Control', 'Shift', 'Alt', 'Meta', 'OS', 'AltGraph'].includes(event.key)) {
-        const lone = LONE_MODIFIER_CODES[event.code]
+      // Match right-hand modifiers by position (`event.code`) too: Korean
+      // keyboard types such as kbd101a report right Ctrl/Alt as
+      // `HanjaMode`/`HangulMode` (or `Process` under the IME), not `Control`.
+      const lone = LONE_MODIFIER_CODES[event.code]
+      if (lone || ['Control', 'Shift', 'Alt', 'Meta', 'OS', 'AltGraph'].includes(event.key)) {
         if (lone) {
           heldRight.current = parts.length <= 1 ? lone : null
         } else if (
@@ -219,7 +222,9 @@ export function HotkeyRecorder({
 
       loneModifier.current = null
       setModifierHint(null)
-      if (heldRight.current && parts.length === 1) {
+      // The held right key adds no modifier flag when the layout maps it to
+      // 한자/한/영, so zero flags also means "only the right key is held".
+      if (heldRight.current && parts.length <= 1) {
         const comboKey = comboKeyFromCode(event.code)
         if (comboKey) {
           proposeHotkey(`${heldRight.current}+${comboKey}`)

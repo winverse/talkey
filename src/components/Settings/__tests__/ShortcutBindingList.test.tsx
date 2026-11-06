@@ -175,6 +175,57 @@ describe('ShortcutBindingList', () => {
     expect(tauri.resumeHotkey).toHaveBeenCalled()
   })
 
+  // Korean keyboard type kbd101a: right Ctrl is the 한자 key and reports
+  // key "HanjaMode" (or "Process" under the IME) with code "ControlRight".
+  it.each(['HanjaMode', 'Process'])(
+    'records right Ctrl on a Korean layout (key %s) as a lone hotkey',
+    (key) => {
+      const onChange = vi.fn()
+      render(
+        <ShortcutBindingList
+          role="dictation"
+          label="Dictate"
+          bindings={[ctrlSlash]}
+          otherBindings={[]}
+          required
+          specialOptions={[]}
+          onChange={onChange}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add shortcut' }))
+      fireEvent.keyDown(window, { key, code: 'ControlRight' })
+      fireEvent.keyUp(window, { key: 'HanjaMode', code: 'ControlRight' })
+      fireEvent.click(screen.getByRole('button', { name: /Right Ctrl/ }))
+
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(onChange.mock.calls[0][0][1]).toMatchObject({ primary: 'RightCtrl' })
+    },
+  )
+
+  it('records right Ctrl + key on a Korean layout as a native combo', () => {
+    const onChange = vi.fn()
+    render(
+      <ShortcutBindingList
+        role="dictation"
+        label="Dictate"
+        bindings={[ctrlSlash]}
+        otherBindings={[]}
+        required
+        specialOptions={[]}
+        onChange={onChange}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add shortcut' }))
+    fireEvent.keyDown(window, { key: 'HanjaMode', code: 'ControlRight' })
+    fireEvent.keyDown(window, { key: '/', code: 'Slash' })
+    fireEvent.click(screen.getByRole('button', { name: /Right Ctrl/ }))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange.mock.calls[0][0][1]).toMatchObject({ primary: '/' })
+  })
+
   it('resumes global hotkeys when capture is abandoned by unmounting', () => {
     const { unmount } = render(
       <ShortcutBindingList
