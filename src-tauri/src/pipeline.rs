@@ -1162,13 +1162,13 @@ impl PipelineHandle {
             .preloaded_config
             .lock()
             .unwrap_or_else(|e| e.into_inner()) = Some(config_data.clone());
+        // Capture the app context in the background (about 0.5s on macOS) so recording
+        // starts at once. The snapshot is taken after recording and waits for this capture.
         *self
             .preloaded_app_ctx
             .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some(
-            self.context_detector
-                .snapshot_for_recording_enabled(config_data.context_adaptation_enabled),
-        );
+            .unwrap_or_else(|e| e.into_inner()) = None;
+        self.context_detector.request_capture();
         let dictionary_store = self.app_handle.state::<storage::DictionaryStore>();
         let dict_words = dictionary_store.words().await;
         let stt_prompt_hint = stt::build_prompt_hint(&dict_words);

@@ -1,4 +1,3 @@
-use crate::app_detector::types::RecordingContext;
 use crate::audio::{AudioCaptureHandle, AudioConfig};
 use crate::credentials::{
     resolve_llm_config_secret, resolve_stt_config_secret, SystemCredentialVault,
@@ -142,7 +141,6 @@ pub struct AskDictationSession {
     handle: AudioCaptureHandle,
     recording_session_id: u64,
     operation_id: String,
-    recording_context: RecordingContext,
     selected_text: Option<String>,
     transcript: Arc<Mutex<String>>,
     error: Arc<Mutex<Option<String>>>,
@@ -1029,9 +1027,9 @@ pub(crate) async fn start_reserved_ask_dictation(
 ) -> Result<AskDictationStartResult, String> {
     let result = async {
         let config = config_state.load().await.map_err(|e| e.to_string())?;
-        let recording_context = app
-            .state::<crate::app_detector::ContextDetectorHandle>()
-            .snapshot_for_recording_enabled(config.context_adaptation_enabled);
+        // Captured in the background; read with the snapshot when the draft is made.
+        app.state::<crate::app_detector::ContextDetectorHandle>()
+            .request_capture();
         let selected_text = if include_selected_text && config.selected_text_enabled {
             tokio::task::block_in_place(crate::selection::capture_selected_text)
         } else {
@@ -1136,7 +1134,6 @@ pub(crate) async fn start_reserved_ask_dictation(
                     handle: handle.take().expect("Ask audio handle was already consumed"),
                     recording_session_id,
                     operation_id,
-                    recording_context,
                     selected_text,
                     transcript: transcript.clone(),
                     error: error.clone(),
@@ -1465,11 +1462,14 @@ pub async fn stop_ask_dictation(
         }
 
         if voice_intent.kind == VoiceIntentKind::DraftInsert {
+            let recording_context = app
+                .state::<crate::app_detector::ContextDetectorHandle>()
+                .snapshot_for_recording_enabled(config.context_adaptation_enabled);
             let draft = app
                 .state::<crate::pipeline::PipelineHandle>()
                 .run_ask_draft(
                     &config,
-                    &session.recording_context,
+                    &recording_context,
                     &question,
                     &session.operation_id,
                     voice_intent.clone(),

@@ -16,7 +16,9 @@ use super::user_mappings::{
 };
 
 const DEFAULT_STALE_AFTER: Duration = Duration::from_secs(2);
-const DEFAULT_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
+/// How long a reader waits for a capture that was requested but has not finished.
+/// One macOS capture (front app + browser URL via AppleScript) takes about 0.5s.
+const CAPTURE_WAIT: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Copy, Debug)]
 enum RefreshSignal {
@@ -78,37 +80,26 @@ pub struct ContextDetectorHandle {
     stale_after: Duration,
     latest_candidate: Arc<Mutex<Option<MappingCandidate>>>,
     candidate_generation: Arc<AtomicU64>,
+    capture_requested_at: Arc<Mutex<Option<Instant>>>,
 }
 
 impl ContextDetectorHandle {
     pub fn start_default(mapping_store: UserAppMappingStore) -> Self {
-        Self::start_with_mapping_store(
-            default_source(),
-            mapping_store,
-            DEFAULT_REFRESH_INTERVAL,
-            DEFAULT_STALE_AFTER,
-        )
+        Self::start_with_mapping_store(default_source(), mapping_store, DEFAULT_STALE_AFTER)
     }
 
     #[cfg(test)]
     pub(crate) fn start_with_source(
         source: Arc<dyn ContextSignalSource>,
         registry: AppRegistry,
-        refresh_interval: Duration,
         stale_after: Duration,
     ) -> Self {
-        Self::start_with_mapping_store(
-            source,
-            UserAppMappingStore::memory(registry),
-            refresh_interval,
-            stale_after,
-        )
+        Self::start_with_mapping_store(source, UserAppMappingStore::memory(registry), stale_after)
     }
 
     fn start_with_mapping_store(
         source: Arc<dyn ContextSignalSource>,
         mapping_store: UserAppMappingStore,
-        refresh_interval: Duration,
         stale_after: Duration,
     ) -> Self {
         let cached = Arc::new(RwLock::new(CachedContext {
@@ -139,7 +130,6 @@ impl ContextDetectorHandle {
                     worker_cached,
                     refresh_rx,
                     worker_shutdown,
-                    refresh_interval,
                 );
             })
             .expect("failed to start context detector thread");
@@ -159,6 +149,59 @@ impl ContextDetectorHandle {
             stale_after,
             latest_candidate,
             candidate_generation: Arc::new(AtomicU64::new(0)),
+            capture_requested_at: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Starts capturing the current app context in the background and returns at once.
+    ///
+    /// The detector no longer polls: on macOS every capture sends AppleScript to the
+    /// front app (and to the browser for its URL), and doing that every second made
+    /// browsers move focus on their own, for example to YouTube's search box while a
+    /// fullscreen video was playing. Call this when a recording starts; the next
+    /// `snapshot_for_recording*` call waits for this capture and keeps using it.
+    pub fn request_capture(&self) {
+        *self
+            .capture_requested_at
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(Instant::now());
+        self.request_refresh();
+    }
+
+    fn requested_capture_pending(&self, captured_at: Instant) -> bool {
+        self.capture_requested_at
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .is_some_and(|requested_at| captured_at < requested_at)
+    }
+
+    fn wait_for_requested_capture(&self) {
+        let deadline = Instant::now() + CAPTURE_WAIT;
+        loop {
+            let captured_at = self
+                .cached
+                .read()
+                .unwrap_or_else(|error| error.into_inner())
+                .snapshot
+                .captured_at;
+            if !self.requested_capture_pending(captured_at) || Instant::now() >= deadline {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// A capture taken for the latest `request_capture` stays valid however old it is,
+    /// because it describes the app at the moment the recording started. Without a
+    /// request the cache is only trusted for `stale_after`.
+    fn snapshot_is_current(&self, captured_at: Instant) -> bool {
+        match *self
+            .capture_requested_at
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+        {
+            Some(requested_at) => captured_at >= requested_at,
+            None => captured_at.elapsed() <= self.stale_after,
         }
     }
 
@@ -167,11 +210,12 @@ impl ContextDetectorHandle {
     }
 
     pub fn snapshot_for_recording_enabled(&self, enabled: bool) -> RecordingContext {
+        self.wait_for_requested_capture();
         let cached = self
             .cached
             .read()
             .unwrap_or_else(|error| error.into_inner());
-        let stale = cached.snapshot.captured_at.elapsed() > self.stale_after;
+        let stale = !self.snapshot_is_current(cached.snapshot.captured_at);
         let profile = if enabled && !stale {
             cached.snapshot.profile.clone()
         } else {
@@ -264,6 +308,9 @@ impl ContextDetectorHandle {
             .clone()
     }
 
+    /// Cheap check used between streamed chunks. Since the detector does not poll, an
+    /// old cache schedules a refresh and is compared as is; the refreshed result is used
+    /// from the next chunk on (about 0.5s later on macOS).
     pub fn target_still_matches(&self, expected: &TargetAppGuard) -> bool {
         if expected.is_empty() {
             return true;
@@ -272,8 +319,13 @@ impl ContextDetectorHandle {
             .cached
             .read()
             .unwrap_or_else(|error| error.into_inner());
-        cached.snapshot.captured_at.elapsed() <= self.stale_after
-            && expected.matches(&cached.target_guard)
+        let old = cached.snapshot.captured_at.elapsed() > self.stale_after;
+        let matches = expected.matches(&cached.target_guard);
+        drop(cached);
+        if old {
+            self.request_refresh();
+        }
+        matches
     }
 
     pub fn target_still_matches_now(&self, expected: &TargetAppGuard) -> bool {
@@ -359,28 +411,16 @@ fn run_detector(
     cached: Arc<RwLock<CachedContext>>,
     refresh_rx: Receiver<RefreshSignal>,
     shutdown: Arc<AtomicBool>,
-    refresh_interval: Duration,
 ) {
     refresh_context(source.as_ref(), &mapping_store, &cached);
-    let mut last_refresh = Instant::now();
 
+    // Refresh only when asked. No timer: see `ContextDetectorHandle::request_capture`.
     while !shutdown.load(Ordering::SeqCst) {
-        let signal = match refresh_rx.recv_timeout(refresh_interval) {
-            Ok(signal) => signal,
-            Err(mpsc::RecvTimeoutError::Timeout) => RefreshSignal::Normal,
-            Err(mpsc::RecvTimeoutError::Disconnected) => break,
-        };
-        match signal {
-            RefreshSignal::Shutdown => break,
-            RefreshSignal::FocusChanged => {
+        match refresh_rx.recv() {
+            Ok(RefreshSignal::Shutdown) | Err(_) => break,
+            Ok(RefreshSignal::Normal | RefreshSignal::FocusChanged) => {
                 refresh_context(source.as_ref(), &mapping_store, &cached);
-                last_refresh = Instant::now();
             }
-            RefreshSignal::Normal if last_refresh.elapsed() >= refresh_interval => {
-                refresh_context(source.as_ref(), &mapping_store, &cached);
-                last_refresh = Instant::now();
-            }
-            RefreshSignal::Normal => {}
         }
     }
 }
@@ -390,6 +430,9 @@ fn refresh_context(
     mapping_store: &UserAppMappingStore,
     cached: &RwLock<CachedContext>,
 ) {
+    // Stamp the capture with the time it started, so a capture already running when
+    // `request_capture` is called does not count as the requested one.
+    let started_at = Instant::now();
     let (
         profile,
         target_guard,
@@ -427,7 +470,7 @@ fn refresh_context(
     *cached.write().unwrap_or_else(|error| error.into_inner()) = CachedContext {
         snapshot: ContextSnapshot {
             profile,
-            captured_at: Instant::now(),
+            captured_at: started_at,
         },
         target_guard,
         mapped_scene_id,
@@ -514,9 +557,54 @@ mod tests {
         ContextDetectorHandle::start_with_source(
             source,
             AppRegistry::builtin().unwrap(),
-            Duration::from_millis(50),
-            Duration::from_millis(100),
+            Duration::from_secs(1),
         )
+    }
+
+    fn slack_signals() -> ContextSignals {
+        ContextSignals {
+            native_identity: Some("com.tinyspeck.slackmacgap".to_string()),
+            process_alias: Some("Slack".to_string()),
+            process_id: Some(77),
+            ..ContextSignals::default()
+        }
+    }
+
+    #[test]
+    fn idle_detector_does_not_poll_the_front_app() {
+        let source = Arc::new(FakeSource::new(Some(gmail_signals())));
+        let handle = detector(source.clone());
+        wait_for_profile(&handle, "email.gmail");
+        let calls_after_start = source.calls.load(Ordering::SeqCst);
+
+        std::thread::sleep(Duration::from_millis(300));
+
+        assert_eq!(source.calls.load(Ordering::SeqCst), calls_after_start);
+    }
+
+    #[test]
+    fn requested_capture_is_awaited_and_kept_after_recording() {
+        let source = Arc::new(FakeSource::new(Some(gmail_signals())));
+        let handle = ContextDetectorHandle::start_with_source(
+            source.clone(),
+            AppRegistry::builtin().unwrap(),
+            Duration::from_millis(100),
+        );
+        wait_for_profile(&handle, "email.gmail");
+
+        // Hotkey pressed while Slack is in front; read right away, before the
+        // background capture could have been published.
+        source.set(Some(slack_signals()));
+        handle.request_capture();
+        let at_start = handle.snapshot_for_recording();
+        assert_eq!(at_start.profile.id, "chat.slack");
+
+        // The user moves on while the recording runs past `stale_after`.
+        source.set(Some(gmail_signals()));
+        std::thread::sleep(Duration::from_millis(200));
+        let after_recording = handle.snapshot_for_recording();
+        assert_eq!(after_recording.profile.id, "chat.slack");
+        assert_eq!(after_recording.target_guard.process_id, Some(77));
     }
 
     #[test]
@@ -525,12 +613,7 @@ mod tests {
         let handle = detector(source.clone());
         wait_for_profile(&handle, "email.gmail");
 
-        source.set(Some(ContextSignals {
-            native_identity: Some("com.tinyspeck.slackmacgap".to_string()),
-            process_alias: Some("Slack".to_string()),
-            process_id: Some(77),
-            ..ContextSignals::default()
-        }));
+        source.set(Some(slack_signals()));
         handle.notify_focus_changed();
         wait_for_profile(&handle, "chat.slack");
         let captured = handle.snapshot_for_recording();
