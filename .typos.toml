@@ -12,6 +12,8 @@ speaches = "speaches"
 Speaches = "Speaches"
 SPEACHES = "SPEACHES"
 visibile = "visibile"
+# CoreAudio four-char code for kAudioObjectPropertyScopeInput (audio/mic_mute.rs)
+inpt = "inpt"
 
 [files]
 extend-exclude = [
