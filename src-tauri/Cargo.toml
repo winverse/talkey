@@ -43,14 +43,16 @@ futures-util = "0.3"
 async-trait = "0.1.92"
 arboard = "3"
 http = "1"
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 csv = "1.3"
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = "0.4"
 url = "2"
 flate2 = "1"
-tauri-plugin-updater = "2"
+# The `zip` feature only unpacks Tauri v1-style Windows update zips. Talkey does
+# not ship those, and zip 4.x has open advisories.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-process = "2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
