@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Settings, History, LogOut, CircleUser, Crown, AppWindow, Eye, EyeOff } from 'lucide-react'
-import { setCapsuleAutoHide } from '../../lib/tauri'
+import { openMainWindow as openMainWindowAt, setCapsuleAutoHide } from '../../lib/tauri'
 import { useAppStore } from '../../stores/appStore'
 
 interface Props {
@@ -11,19 +11,11 @@ export function CapsuleContextMenu({ onClose }: Props) {
   const { t } = useTranslation()
   const capsuleAutoHide = useAppStore((s) => s.config.capsule_auto_hide)
 
-  const openMainWindow = async (hash: string) => {
-    try {
-      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-      const { emitTo } = await import('@tauri-apps/api/event')
-      const mainWin = await WebviewWindow.getByLabel('main')
-      if (mainWin) {
-        await mainWin.show()
-        await mainWin.setFocus()
-        await emitTo('main', 'navigate', hash)
-      }
-    } catch {
+  // The backend also shows the Dock icon on macOS while the window is open.
+  const openMainWindow = (hash: string) => {
+    openMainWindowAt(hash).catch(() => {
       /* ignore – window may not exist */
-    }
+    })
   }
 
   const items = [

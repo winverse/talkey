@@ -369,6 +369,8 @@ pub struct AppConfig {
     pub theme: String,
     pub auto_start: bool,
     pub close_to_tray: bool,
+    /// No longer read: Talkey always starts in the tray once onboarding is done.
+    /// Kept so saved settings and backups keep the same shape.
     pub start_minimized: bool,
     pub recording_limit_mode: crate::stt::capabilities::RecordingLimitMode,
     pub custom_recording_limit_seconds: u32,

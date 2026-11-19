@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setCapsuleAutoHide } from '../../../lib/tauri'
+import { openMainWindow, setCapsuleAutoHide } from '../../../lib/tauri'
 import { useAppStore } from '../../../stores/appStore'
 import { CapsuleContextMenu } from '../CapsuleContextMenu'
 
@@ -23,6 +23,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../../../lib/tauri', () => ({
+  openMainWindow: vi.fn().mockResolvedValue(undefined),
   setCapsuleAutoHide: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -51,6 +52,18 @@ describe('CapsuleContextMenu', () => {
 
     await waitFor(() => expect(setCapsuleAutoHide).toHaveBeenCalledWith(true))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('opens the main window through the backend', async () => {
+    const onClose = vi.fn()
+    render(<CapsuleContextMenu onClose={onClose} />)
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /open main window/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^history$/i }))
+
+    await waitFor(() => expect(openMainWindow).toHaveBeenCalledWith('#/'))
+    expect(openMainWindow).toHaveBeenCalledWith('#/history')
+    expect(onClose).toHaveBeenCalledTimes(2)
   })
 
   it('shows keep visible action when auto-hide is enabled', () => {

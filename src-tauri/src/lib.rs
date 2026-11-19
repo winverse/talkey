@@ -179,11 +179,39 @@ fn should_restore_main_window_on_reopen(_has_visible_windows: bool) -> bool {
     true
 }
 
+/// Talkey starts in the tray (the menu bar on macOS) and opens the main window
+/// only from there. The first run still opens it for onboarding.
+fn should_show_main_window_on_startup(onboarding_completed: bool) -> bool {
+    !onboarding_completed
+}
+
+/// macOS shows Talkey in the Dock only while the main window is open. The rest
+/// of the time it lives in the menu bar alone.
+#[cfg(target_os = "macos")]
+fn set_dock_icon_visible(app: &tauri::AppHandle, visible: bool) {
+    let policy = if visible {
+        tauri::ActivationPolicy::Regular
+    } else {
+        tauri::ActivationPolicy::Accessory
+    };
+    if let Err(error) = app.set_activation_policy(policy) {
+        tracing::warn!("Failed to change the Dock icon visibility: {error}");
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_dock_icon_visible(_app: &tauri::AppHandle, _visible: bool) {}
+
+fn present_main_window(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    set_dock_icon_visible(app, true);
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
 fn restore_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
+        present_main_window(app, &window);
     }
 }
 
@@ -292,6 +320,16 @@ mod tests {
     #[test]
     fn dock_reopen_restores_main_window_even_when_capsule_is_visible() {
         assert!(should_restore_main_window_on_reopen(true));
+    }
+
+    #[test]
+    fn startup_keeps_main_window_hidden_after_onboarding() {
+        assert!(!should_show_main_window_on_startup(true));
+    }
+
+    #[test]
+    fn startup_shows_main_window_for_first_run_onboarding() {
+        assert!(should_show_main_window_on_startup(false));
     }
 
     #[test]
@@ -548,8 +586,7 @@ fn show_main_window_at(app: &tauri::AppHandle, hash: &str) {
         if !hash.is_empty() {
             let _ = window.emit("navigate", hash);
         }
-        let _ = window.show();
-        let _ = window.set_focus();
+        present_main_window(app, &window);
     }
 }
 
@@ -557,9 +594,15 @@ fn show_main_window_at(app: &tauri::AppHandle, hash: &str) {
 fn show_main_window_with(app: &tauri::AppHandle, event: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.emit(event, ());
-        let _ = window.show();
-        let _ = window.set_focus();
+        present_main_window(app, &window);
     }
+}
+
+/// Opens the main window at `hash` for other Talkey windows (the capsule menu),
+/// the same way the tray does.
+#[tauri::command]
+fn open_main_window(app: tauri::AppHandle, hash: String) {
+    show_main_window_at(&app, &hash);
 }
 
 #[tauri::command]
@@ -1133,7 +1176,7 @@ pub fn run() {
                         }
                     );
                     if should_show {
-                        show_main_window_at(tray.app_handle(), "");
+                        show_main_window_at(tray.app_handle(), "#/");
                     }
                 })
                 .build(app)?;
@@ -1183,6 +1226,7 @@ pub fn run() {
                                 }
                                 let _ = w.hide();
                             }
+                            set_dock_icon_visible(&handle, false);
                             refresh_tray(&handle);
                         }
                     }
@@ -1215,12 +1259,23 @@ pub fn run() {
             // Window size preset: zoom only, the restored window size is kept.
             ui_scale::apply(app.handle(), initial_config.ui_scale, false);
 
-            // Start minimized: only show window if not configured to start minimized
-            if !initial_config.start_minimized {
+            let onboarding_completed = app
+                .handle()
+                .store("settings.json")
+                .ok()
+                .and_then(|store| store.get("onboarding_completed"))
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            let show_main_window = should_show_main_window_on_startup(onboarding_completed);
+            if show_main_window {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    present_main_window(app.handle(), &window);
                 }
+            }
+            // Set before launch finishes so the Dock icon never appears.
+            #[cfg(target_os = "macos")]
+            if !show_main_window {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
             tracing::info!("Talkey started");
@@ -1244,6 +1299,7 @@ pub fn run() {
             stop_recording,
             abort_recording,
             get_input_device_name,
+            open_main_window,
             commands::ask::ask_anything,
             commands::ask::start_ask_dictation,
             commands::ask::stop_ask_dictation,

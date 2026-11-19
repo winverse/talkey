@@ -26,6 +26,11 @@ export async function getInputDeviceName(): Promise<string | null> {
   return invoke('get_input_device_name')
 }
 
+/** Opens the main window at `hash`, the same way the tray does. */
+export async function openMainWindow(hash: string): Promise<void> {
+  return invoke('open_main_window', { hash })
+}
+
 export async function abortRecording(): Promise<void> {
   return invoke('abort_recording')
 }
