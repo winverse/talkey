@@ -26,6 +26,14 @@ const windowApiMocks = vi.hoisted(() => ({
   hide: vi.fn(),
 }))
 
+const coreMocks = vi.hoisted(() => ({
+  invoke: vi.fn(),
+}))
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: coreMocks.invoke,
+}))
+
 vi.mock('@tauri-apps/api/window', () => {
   class LogicalSize {
     constructor(
@@ -335,10 +343,113 @@ describe('useCapsuleResize async updates', () => {
     windowApiMocks.scaleFactor.mockReset().mockResolvedValue(1)
     windowApiMocks.show.mockReset().mockResolvedValue(undefined)
     windowApiMocks.hide.mockReset().mockResolvedValue(undefined)
+    coreMocks.invoke.mockReset().mockResolvedValue(false)
   })
 
   afterEach(() => {
     cleanup()
+  })
+
+  async function renderHidden() {
+    render(createElement(HookHarness))
+    await waitFor(() => {
+      expect(windowApiMocks.hide).toHaveBeenCalledTimes(1)
+    })
+    windowApiMocks.setSize.mockClear()
+    windowApiMocks.setPosition.mockClear()
+    windowApiMocks.show.mockClear()
+    windowApiMocks.hide.mockClear()
+  }
+
+  it('asks the backend to place the capsule on the active screen when it appears', async () => {
+    coreMocks.invoke.mockResolvedValue(true)
+    await renderHidden()
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'recording' })
+    })
+
+    await waitFor(() => {
+      expect(windowApiMocks.show).toHaveBeenCalledTimes(1)
+    })
+    expect(coreMocks.invoke).toHaveBeenCalledTimes(1)
+    expect(coreMocks.invoke).toHaveBeenCalledWith('place_capsule_on_active_screen', {
+      width: expect.any(Number),
+      height: expect.any(Number),
+    })
+    // The backend already sized and moved the window.
+    expect(windowApiMocks.setSize).not.toHaveBeenCalled()
+    expect(windowApiMocks.setPosition).not.toHaveBeenCalled()
+  })
+
+  it('does not move a capsule that is already showing', async () => {
+    coreMocks.invoke.mockResolvedValue(true)
+    await renderHidden()
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'recording' })
+    })
+    await waitFor(() => {
+      expect(windowApiMocks.show).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'transcribing' })
+    })
+    await waitFor(() => {
+      expect(windowApiMocks.show).toHaveBeenCalledTimes(2)
+    })
+
+    expect(coreMocks.invoke).toHaveBeenCalledTimes(1)
+    // Later resizes keep the capsule where it is (left edge, vertical centre).
+    expect(windowApiMocks.setPosition).toHaveBeenCalledTimes(1)
+  })
+
+  it('places the capsule again the next time it appears', async () => {
+    coreMocks.invoke.mockResolvedValue(true)
+    await renderHidden()
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'recording' })
+    })
+    await waitFor(() => {
+      expect(windowApiMocks.show).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'idle' })
+    })
+    await waitFor(() => {
+      expect(windowApiMocks.hide).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'recording' })
+    })
+    await waitFor(() => {
+      expect(windowApiMocks.show).toHaveBeenCalledTimes(2)
+    })
+
+    expect(coreMocks.invoke).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps its own placement when the active screen is unknown', async () => {
+    await renderHidden()
+    windowApiMocks.outerPosition.mockResolvedValue({ x: 100, y: 100 })
+
+    act(() => {
+      useAppStore.setState({ pipelineState: 'recording' })
+    })
+
+    await waitFor(() => {
+      expect(windowApiMocks.show).toHaveBeenCalledTimes(1)
+    })
+    expect(coreMocks.invoke).toHaveBeenCalledWith(
+      'place_capsule_on_active_screen',
+      expect.anything(),
+    )
+    expect(windowApiMocks.setSize).toHaveBeenCalledTimes(1)
+    expect(windowApiMocks.setPosition).toHaveBeenCalledTimes(1)
   })
 
   it('prevents a superseded async resize from overwriting the latest window state', async () => {
