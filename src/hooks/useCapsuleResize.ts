@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { useAppStore, type PipelineState } from '../stores/appStore'
 import { getCapsuleShellSize, MIC_LABEL_SPACE, showsMicLabel } from '../components/Capsule/layout'
 
@@ -156,6 +157,7 @@ export function useCapsuleResize() {
   const translating = useAppStore((s) => s.activeVoiceMode === 'translate')
   const initialized = useRef(false)
   const prevWindowSize = useRef<{ width: number; height: number } | null>(null)
+  const shown = useRef(false)
   const effectGeneration = useRef(0)
 
   const hasError = pipelineError !== null
@@ -201,6 +203,26 @@ export function useCapsuleResize() {
           await win.setFocusable(getCapsuleFocusable()).catch(() => {})
           if (!isCurrent()) return
 
+          if (shouldShow && !shown.current) {
+            // Appearing: open on the screen the user is working on (macOS and
+            // Windows), not wherever it was last placed. The command resizes
+            // and moves the window, or returns false and leaves it alone.
+            const placed = await invoke<boolean>('place_capsule_on_active_screen', {
+              width: windowWidth,
+              height: windowHeight,
+            }).catch(() => false)
+            if (!isCurrent()) return
+
+            if (placed === true) {
+              initialized.current = true
+              prevWindowSize.current = { width: windowWidth, height: windowHeight }
+              if (contextMenuOpen) setContextMenuReady(true)
+              await win.show().catch(() => {})
+              shown.current = true
+              return
+            }
+          }
+
           if (!initialized.current) {
             // First mount: position at bottom-center of screen, then show
             if (!isCurrent()) return
@@ -239,6 +261,7 @@ export function useCapsuleResize() {
             } else {
               await win.hide().catch(() => {})
             }
+            shown.current = shouldShow
             if (!isCurrent()) return
 
             initialized.current = true
@@ -340,6 +363,7 @@ export function useCapsuleResize() {
           } else {
             await win.hide().catch(() => {})
           }
+          shown.current = shouldShow
           if (!isCurrent()) return
         },
       )

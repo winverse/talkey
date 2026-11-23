@@ -1,5 +1,6 @@
 pub mod app_detector;
 pub mod audio;
+pub mod capsule_placement;
 pub mod cloud_request;
 pub mod commands;
 pub mod credential_file;
@@ -1365,6 +1366,7 @@ pub fn run() {
             commands::misc::get_system_diagnostics,
             commands::config::set_auto_start,
             commands::config::set_capsule_auto_hide,
+            capsule_placement::place_capsule_on_active_screen,
             commands::config::get_session_token,
             commands::config::set_session_token,
         ])
